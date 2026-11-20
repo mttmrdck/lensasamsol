@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "archive-gallery",
+  "name": "lensasamsol",
   "main": "worker/index.ts",
   "compatibility_date": "2026-11-01",
   "compatibility_flags": [
@@ -21,7 +21,7 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "archive-gallery",
+      "database_name": "lensasamsol",
       "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "migrations"
     }
@@ -44,7 +44,7 @@
   },
   "env": {
     "test": {
-      "name": "archive-gallery-test",
+      "name": "lensasamsol-test",
       "workers_dev": false,
       "preview_urls": false,
       "vars": {
@@ -55,14 +55,14 @@
       "d1_databases": [
         {
           "binding": "DB",
-          "database_name": "archive-gallery-test",
+          "database_name": "lensasamsol-test",
           "database_id": "00000000-0000-0000-0000-000000000001",
           "migrations_dir": "migrations"
         }
       ]
     },
     "staging": {
-      "name": "archive-gallery-staging",
+      "name": "lensasamsol-staging",
       "workers_dev": true,
       "preview_urls": false,
       "vars": {
@@ -82,14 +82,14 @@
       "d1_databases": [
         {
           "binding": "DB",
-          "database_name": "archive-gallery-staging",
+          "database_name": "lensasamsol-staging",
           "database_id": "00000000-0000-0000-0000-000000000000",
           "migrations_dir": "migrations"
         }
       ]
     },
     "production": {
-      "name": "archive-gallery-production",
+      "name": "lensasamsol",
       "workers_dev": true,
       "preview_urls": false,
       "vars": {
@@ -109,7 +109,7 @@
       "d1_databases": [
         {
           "binding": "DB",
-          "database_name": "archive-gallery-production",
+          "database_name": "lensasamsol-production",
           "database_id": "00000000-0000-0000-0000-000000000000",
           "migrations_dir": "migrations"
         }

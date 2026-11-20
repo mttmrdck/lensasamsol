@@ -113,6 +113,6 @@ describe('configurationErrors', () => {
   });
 
   it('rejects requests arriving on a non-canonical origin', async () => {
-    expect(await configurationErrors(production(), 'https://archive-gallery.someone.workers.dev/')).toContain('canonical_origin');
+    expect(await configurationErrors(production(), 'https://lensasamsol.someone.workers.dev/')).toContain('canonical_origin');
   });
 });

@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync, readdirSync, statSync, existsSync, mkdirSy
 import { resolve, relative, dirname, join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { assertReleaseConfig, readWranglerConfig } from './lib/release-config.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 process.chdir(root);
@@ -29,28 +30,7 @@ function sourceDigest() {
   return hash(JSON.stringify(files.filter((p) => existsSync(p) && statSync(p).isFile()).map((p) => [p, hash(readFileSync(p))])));
 }
 function check() {
-  const config = json('wrangler.jsonc'); // Deliberately requires strict JSON.
-  const selected = config.env?.[environment];
-  if (!selected) fail(`Missing ${environment} overlay`);
-  const ids = [];
-  for (const name of ['staging', 'production']) {
-    const overlay = config.env?.[name];
-    const db = overlay?.d1_databases?.find((binding) => binding.binding === 'DB');
-    if (!db || !/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(db.database_id) || /^(0+|1+|f+)$/i.test(db.database_id.replaceAll('-', '')) || /placeholder|unconfigured|replace|example/i.test(db.database_name ?? '')) fail(`${name} requires an explicitly configured D1 database UUID/name`);
-    ids.push(db.database_id.toLowerCase());
-    if (!overlay.name || overlay.name === config.name) fail(`${name} requires its own Worker name`);
-  }
-  if (ids[0] === ids[1]) fail('Staging and production must use different D1 databases');
-  for (const binding of [...(config.d1_databases ?? []), ...(config.env?.test?.d1_databases ?? [])]) {
-    if (ids.includes(binding.database_id?.toLowerCase())) fail('Release D1 must be isolated from development/test');
-  }
-  if (config.env.staging.name === config.env.production.name) fail('Release Worker names must differ');
-  if (selected.vars?.APP_ENV !== environment || selected.vars?.DEMO_MODE !== 'false') fail('Release requires matching APP_ENV and DEMO_MODE=false');
-  let origin;
-  try { origin = new URL(selected.vars.PUBLIC_ORIGIN); } catch { fail('Configure PUBLIC_ORIGIN'); }
-  if (origin.protocol !== 'https:' || origin.origin !== selected.vars.PUBLIC_ORIGIN || origin.username || origin.password || /(^|\.)(localhost|local|test|invalid|example)(\.|$)|^(127\.|0\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)|:/.test(origin.hostname) || !origin.hostname.includes('.')) fail('PUBLIC_ORIGIN must be a real HTTPS public origin without path or credentials');
-  const other = config.env[environment === 'staging' ? 'production' : 'staging'].vars?.PUBLIC_ORIGIN;
-  if (other && other === selected.vars.PUBLIC_ORIGIN) fail('Release origins must differ');
+  const selected = assertReleaseConfig(readWranglerConfig(), environment); // Strict JSON; shared with the Vite build guard.
   console.log(`${environment}: config checks passed (remote secrets and ownership remain operator checks)`);
   return selected;
 }

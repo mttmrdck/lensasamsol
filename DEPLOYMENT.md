@@ -4,7 +4,7 @@ The prepared source is not a live deployment. No Cloudflare account, database, G
 
 ## Owner decisions before release
 
-Choose the Cloudflare account owner, Google Drive account owner, separate staging/production D1 databases, exact public origins and a backup custodian. Keep recovery methods and MFA under the owner's control. Configure both remote D1 UUIDs in `wrangler.jsonc`; the release isolation guard rejects placeholder or shared databases. Set the selected environment's exact HTTPS `PUBLIC_ORIGIN` and retain `APP_ENV` and `DEMO_MODE=false`.
+Choose the Cloudflare account owner, Google Drive account owner, separate staging/production D1 databases, exact public origins and a backup custodian. Keep recovery methods and MFA under the owner's control. The production Worker is the existing `lensasamsol` Worker; staging is `lensasamsol-staging`. Configure both remote D1 UUIDs in `wrangler.jsonc`; the release isolation guard rejects placeholder or shared databases. Set the selected environment's exact HTTPS `PUBLIC_ORIGIN` and retain `APP_ENV` and `DEMO_MODE=false`.
 
 A domain purchase is not required. The configured `workers_dev=true` environments can use their final `https://<worker>.<account-subdomain>.workers.dev` addresses; discover the account subdomain before setting the origin and Google redirect URI. Custom domains can be added later. Do not assume the application's Cache API image caching works on workers.dev; verify that separately, as Cloudflare documents functional Cache API operations for Workers on custom domains. Browser caching still needs its own verification. [Workers routes](https://developers.cloudflare.com/workers/configuration/routing/workers-dev/), [Cache API](https://developers.cloudflare.com/workers/runtime-apis/cache/).
 
@@ -27,7 +27,7 @@ To inspect the built Worker locally, build the test environment and discover its
 ```sh
 node scripts/prepare-test-env.mjs
 CLOUDFLARE_ENV=test npx --no-install vite build
-node -e 'const fs=require("node:fs"); for(const e of fs.readdirSync("dist",{withFileTypes:true})){ const p=`dist/${e.name}/wrangler.json`; if(e.isDirectory()&&fs.existsSync(p)){const c=JSON.parse(fs.readFileSync(p));if(c.name==="archive-gallery-test")console.log(p)}}'
+node -e 'const fs=require("node:fs"); for(const e of fs.readdirSync("dist",{withFileTypes:true})){ const p=`dist/${e.name}/wrangler.json`; if(e.isDirectory()&&fs.existsSync(p)){const c=JSON.parse(fs.readFileSync(p));if(c.name==="lensasamsol-test")console.log(p)}}'
 ```
 
 Use the printed path in place of `<generated-test-config>` below. Run this on loopback only; keep the same isolated persistence directory as test migration/seed preparation. Never substitute a release configuration or operator persistence directory.
