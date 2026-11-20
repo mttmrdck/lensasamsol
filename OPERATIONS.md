@@ -86,7 +86,7 @@ The existing `lensasamsol` Worker builds from GitHub. In the dashboard (Workers 
 | Git repository | `mttmrdck/lensasamsol` (reconnect it if the build still points at the old repository name) |
 | Production branch | `main` |
 | Root directory | `/` |
-| Build command | `npm ci && npm run build` |
+| Build command | `npm run build` (Workers Builds already runs `npm clean-install`) |
 | Deploy command | `npx wrangler deploy` |
 | Build variable | `CLOUDFLARE_ENV` = `production` |
 
