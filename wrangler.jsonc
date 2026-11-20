@@ -68,7 +68,7 @@
       "vars": {
         "APP_ENV": "staging",
         "DEMO_MODE": "false",
-        "PUBLIC_ORIGIN": ""
+        "PUBLIC_ORIGIN": "https://lensasamsol-staging.zafranakif74.workers.dev"
       },
       "secrets": {
         "required": [
@@ -83,7 +83,7 @@
         {
           "binding": "DB",
           "database_name": "lensasamsol-staging",
-          "database_id": "00000000-0000-0000-0000-000000000000",
+          "database_id": "dbf64834-4fdd-4ea6-9859-5f70aeff890a",
           "migrations_dir": "migrations"
         }
       ]
@@ -95,7 +95,7 @@
       "vars": {
         "APP_ENV": "production",
         "DEMO_MODE": "false",
-        "PUBLIC_ORIGIN": ""
+        "PUBLIC_ORIGIN": "https://lensasamsol.zafranakif74.workers.dev"
       },
       "secrets": {
         "required": [

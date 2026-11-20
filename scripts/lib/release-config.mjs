@@ -26,26 +26,29 @@ export function assertReleaseConfig(config, environment) {
   const selected = config.env?.[environment];
   if (!selected) fail(`Missing env.${environment} in wrangler.jsonc`);
 
+  const isPlaceholderDb = (db) =>
+    !db ||
+    !UUID.test(db.database_id ?? '') ||
+    /^(0+|1+|f+)$/i.test(db.database_id.replaceAll('-', '')) ||
+    /placeholder|unconfigured|replace|example/i.test(db.database_name ?? '');
   const ids = {};
   for (const name of RELEASE_ENVIRONMENTS) {
     const overlay = config.env?.[name];
     const db = overlay?.d1_databases?.find((binding) => binding.binding === 'DB');
-    if (
-      !db ||
-      !UUID.test(db.database_id ?? '') ||
-      /^(0+|1+|f+)$/i.test(db.database_id.replaceAll('-', '')) ||
-      /placeholder|unconfigured|replace|example/i.test(db.database_name ?? '')
-    )
-      fail(`env.${name} requires an explicitly configured D1 database UUID (placeholder found)`);
+    // Only the selected environment must be fully real; the other may still be unconfigured (staged rollout).
+    if (isPlaceholderDb(db)) {
+      if (name === environment) fail(`env.${name} requires an explicitly configured D1 database UUID (placeholder found)`);
+      continue;
+    }
     if (!db.database_name?.endsWith(`-${name}`)) fail(`env.${name} D1 database_name must end with "-${name}"`);
     if (db.migrations_dir !== 'migrations') fail(`env.${name} must use migrations_dir "migrations"`);
     ids[name] = db.database_id.toLowerCase();
     if (!overlay.name) fail(`env.${name} requires an explicit Worker name`);
   }
-  if (ids.staging === ids.production) fail('Staging and production must use different D1 databases');
+  if (ids.staging && ids.staging === ids.production) fail('Staging and production must use different D1 databases');
   for (const binding of [...(config.d1_databases ?? []), ...(config.env?.test?.d1_databases ?? [])])
     if (Object.values(ids).includes(binding.database_id?.toLowerCase())) fail('Release D1 must be isolated from development/test');
-  if (config.env.staging.name === config.env.production.name) fail('Staging and production Worker names must differ');
+  if (config.env.staging?.name === config.env.production?.name) fail('Staging and production Worker names must differ');
   if (environment === 'staging' && selected.name === config.name) fail('Staging must not use the production Worker name');
 
   const vars = selected.vars ?? {};

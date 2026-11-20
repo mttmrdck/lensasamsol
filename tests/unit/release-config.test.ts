@@ -41,8 +41,7 @@ describe('assertReleaseConfig', () => {
 
   it.each([
     ['placeholder staging D1 id', (c: Json) => (c.env.staging.d1_databases[0].database_id = '00000000-0000-0000-0000-000000000000'), /placeholder/],
-    ['placeholder production D1 id (checked for staging too)', (c: Json) => (c.env.production.d1_databases[0].database_id = '00000000-0000-0000-0000-000000000000'), /placeholder/],
-    ['non-UUID D1 id', (c: Json) => (c.env.staging.d1_databases[0].database_id = 'not-a-uuid'), /placeholder/],
+        ['non-UUID D1 id', (c: Json) => (c.env.staging.d1_databases[0].database_id = 'not-a-uuid'), /placeholder/],
     ['shared D1 between staging and production', (c: Json) => (c.env.production.d1_databases[0].database_id = STAGING_DB), /different D1/],
     ['release D1 equal to the test D1', (c: Json) => (c.env.test.d1_databases[0].database_id = STAGING_DB), /isolated/],
     ['D1 name not ending in the environment', (c: Json) => (c.env.staging.d1_databases[0].database_name = 'lensasamsol'), /must end with/],
@@ -60,6 +59,12 @@ describe('assertReleaseConfig', () => {
     ['missing migrations_dir', (c: Json) => delete c.env.staging.d1_databases[0].migrations_dir, /migrations_dir/],
   ] as [string, (c: Json) => unknown, RegExp][])('rejects %s', (_label, mutate, message) => {
     expect(() => assertReleaseConfig(broken((c) => void mutate(c)), 'staging')).toThrow(message);
+  });
+
+  it('lets staging proceed while production is still unconfigured, but never the reverse', () => {
+    const c = broken((x) => (x.env.production.d1_databases[0].database_id = '00000000-0000-0000-0000-000000000000'));
+    expect(() => assertReleaseConfig(c, 'staging')).not.toThrow();
+    expect(() => assertReleaseConfig(c, 'production')).toThrow(/placeholder/);
   });
 
   it('rejects an unknown environment', () => {
