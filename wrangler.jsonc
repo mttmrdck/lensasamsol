@@ -1,0 +1,119 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "archive-gallery",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": {
+    "not_found_handling": "single-page-application",
+    "run_worker_first": [
+      "/api",
+      "/api/*",
+      "/img",
+      "/img/*"
+    ],
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "archive-gallery",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "APP_ENV": "development",
+    "DEMO_MODE": "true",
+    "PUBLIC_ORIGIN": "http://localhost:5188"
+  },
+  "observability": {
+    "enabled": true,
+    "redact_query_string": true,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": false
+    },
+    "traces": {
+      "enabled": false
+    }
+  },
+  "env": {
+    "test": {
+      "name": "archive-gallery-test",
+      "workers_dev": false,
+      "preview_urls": false,
+      "vars": {
+        "APP_ENV": "development",
+        "DEMO_MODE": "true",
+        "PUBLIC_ORIGIN": "http://localhost:5190"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "archive-gallery-test",
+          "database_id": "00000000-0000-0000-0000-000000000001",
+          "migrations_dir": "migrations"
+        }
+      ]
+    },
+    "staging": {
+      "name": "archive-gallery-staging",
+      "workers_dev": true,
+      "preview_urls": false,
+      "vars": {
+        "APP_ENV": "staging",
+        "DEMO_MODE": "false",
+        "PUBLIC_ORIGIN": ""
+      },
+      "secrets": {
+        "required": [
+          "ADMIN_CREDENTIALS_JSON",
+          "TOKEN_ENCRYPTION_KEY",
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET",
+          "GOOGLE_ALLOWED_EMAIL"
+        ]
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "archive-gallery-staging",
+          "database_id": "00000000-0000-0000-0000-000000000000",
+          "migrations_dir": "migrations"
+        }
+      ]
+    },
+    "production": {
+      "name": "archive-gallery-production",
+      "workers_dev": true,
+      "preview_urls": false,
+      "vars": {
+        "APP_ENV": "production",
+        "DEMO_MODE": "false",
+        "PUBLIC_ORIGIN": ""
+      },
+      "secrets": {
+        "required": [
+          "ADMIN_CREDENTIALS_JSON",
+          "TOKEN_ENCRYPTION_KEY",
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET",
+          "GOOGLE_ALLOWED_EMAIL"
+        ]
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "archive-gallery-production",
+          "database_id": "00000000-0000-0000-0000-000000000000",
+          "migrations_dir": "migrations"
+        }
+      ]
+    }
+  }
+}

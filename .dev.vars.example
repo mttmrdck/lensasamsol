@@ -1,0 +1,16 @@
+# Copy to .dev.vars for local development. Never commit .dev.vars.
+# Administrator accounts. Set with hidden prompts (writes this line for you):
+#   node scripts/set-admin-users.mjs solfb1 akiffb1
+# Format: [{"username":"…","passwordHash":"pbkdf2$sha256$100000$<salt>$<hash>"}, …]
+ADMIN_CREDENTIALS_JSON=
+# npm run gen-key
+TOKEN_ENCRYPTION_KEY=
+# Required outside local development: the only Google account allowed to connect Drive.
+GOOGLE_ALLOWED_EMAIL=
+# Google Cloud OAuth client (type: Web application).
+# Authorised redirect URI: http://localhost:5188/api/admin/drive/callback
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+# Optional — enables Google Picker in the create flow
+GOOGLE_PICKER_API_KEY=
+GOOGLE_PROJECT_NUMBER=
