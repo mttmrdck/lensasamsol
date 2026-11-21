@@ -386,6 +386,53 @@ export function orientedDims(f: DriveFile): { w: number; h: number; known: boole
   return rot % 2 === 1 ? { w: h, h: w, known: true } : { w, h, known: true };
 }
 
+/**
+ * Opens the ORIGINAL bytes of one Drive file as a stream (alt=media) using the photographer's authorized connection.
+ * The body is never read here: it is handed to the visitor as-is, so the Worker holds no photo in memory and spends
+ * no CPU per byte. `signal` is the visitor's own abort signal, so a cancelled download cancels the Drive fetch.
+ */
+export async function fetchDriveOriginal(
+  env: Env,
+  fileId: string,
+  resourceKey: string | null,
+  signal?: AbortSignal,
+): Promise<Response> {
+  const token = await getAccessToken(env);
+  const headers: Record<string, string> = { authorization: `Bearer ${token}` };
+  if (resourceKey) headers['x-goog-drive-resource-keys'] = `${fileId}/${resourceKey}`;
+  const url = new URL(`${DRIVE}/files/${encodeURIComponent(fileId)}`);
+  url.searchParams.set('alt', 'media');
+  url.searchParams.set('supportsAllDrives', 'true');
+  // Time out waiting for response headers only: an overall timeout would also cut off a healthy long transfer.
+  const connect = new AbortController();
+  const timer = setTimeout(() => connect.abort(), 20_000);
+  const onAbort = () => connect.abort();
+  signal?.addEventListener('abort', onAbort, { once: true });
+  try {
+    const res = await googleFetch(url, { headers, signal: connect.signal });
+    if (!res.ok) {
+      await res.body?.cancel();
+      const quota = res.status === 403 || res.status === 429;
+      throw new DriveError(
+        res.status === 404 ? 'not_found' : quota ? 'forbidden' : res.status >= 500 ? 'upstream' : 'forbidden',
+        res.status === 404
+          ? 'This photograph is no longer available in Google Drive.'
+          : quota
+            ? 'Google Drive is limiting downloads of this file right now.'
+            : 'Google Drive could not provide this photograph.',
+        res.status,
+      );
+    }
+    // The abort link stays in place on success so a cancelled visitor download also cancels the Drive transfer.
+    return res;
+  } catch (e) {
+    signal?.removeEventListener('abort', onAbort);
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Fetch an authorized, bounded derivative. Originals never form the browser response. */
 export async function fetchDrivePreview(
   env: Env,

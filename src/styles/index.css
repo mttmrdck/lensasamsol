@@ -412,6 +412,17 @@
 .g-lb-drive:hover {
   opacity: 0.9;
 }
+/* Open in Drive is the secondary action beside Download. */
+.g-lb-drive.g-lb-secondary {
+  background: transparent;
+  color: var(--lb-fg);
+  border: 1px solid color-mix(in srgb, var(--lb-fg) 35%, transparent);
+  padding: 0 12px;
+}
+.g-lb-drive.g-lb-secondary:hover {
+  opacity: 1;
+  border-color: var(--lb-fg);
+}
 .g-filmstrip {
   display: flex;
   gap: 4px;
@@ -820,4 +831,54 @@
   .g-folio-sheet {
     padding: 8px 8px 24px 0;
   }
+}
+
+/* ---------------------------------------------------------------- Download all (public gallery) */
+.g-dl {
+  order: 1; /* narrow layout: under the collection details, above the photographs */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 0 14px 14px;
+}
+@container gallery (min-width: 900px) {
+  .g-dl {
+    order: 0;
+    padding: 0;
+  }
+}
+.g-dl-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--g-fg) 28%, transparent);
+  color: var(--g-fg);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+}
+.g-dl-btn:hover {
+  border-color: var(--g-fg);
+}
+.g-dl-save {
+  min-height: 28px;
+  background: var(--g-fg);
+  color: var(--g-bg);
+}
+.g-dl-note {
+  max-width: 34ch;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--g-fg2);
+}
+.g-dl-note:empty {
+  display: none;
+}
+.g-dl-link {
+  color: var(--g-fg2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
