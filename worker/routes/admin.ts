@@ -49,8 +49,23 @@ import {
 } from '../../shared/api';
 import { FOLDER_PARSE_MESSAGES, driveFolderUrl, isDriveId, parseDriveFolderInput } from '../../shared/drive';
 import { PRESETS, applyPreset, parseStyle } from '../../shared/style';
+import type { OAuthFailureCode } from '../../shared/oauth';
 
 export const adminRoutes = new Hono<AppEnv>();
+
+function oauthFailure(c: Context<AppEnv>, code: OAuthFailureCode, error?: unknown) {
+  if (c.env.APP_ENV === 'staging') {
+    // Emit fixed classifications only: no exception text, URLs, headers, cookies, or OAuth values.
+    console.warn('oauth_callback_failed', {
+      code,
+      ...(error instanceof DriveError && error.status ? { httpStatus: error.status } : {}),
+      ...(error instanceof DriveError && error.redirectLocationPresent !== undefined
+        ? { hasLocation: error.redirectLocationPresent }
+        : {}),
+    });
+  }
+  return c.redirect(`/admin/drive?error=${code}`);
+}
 
 // OAuth callback is a top-level navigation from Google: it must be reachable without the CSRF header,
 // but still requires a valid admin session cookie + matching single-use state.
@@ -64,31 +79,21 @@ adminRoutes.get('/drive/callback', async (c) => {
   const row = await c.env.DB.prepare('DELETE FROM oauth_states WHERE state = ? AND session_hash = ? RETURNING code_verifier, created_at')
     .bind(state, sessionHash).first<{code_verifier:string;created_at:number}>();
   await c.env.DB.prepare('DELETE FROM oauth_states WHERE created_at < ?').bind(Date.now()-15*60*1000).run();
-  if (err)
-    return c.redirect(
-      `/admin/drive?error=${encodeURIComponent(err === 'access_denied' ? 'Access was declined on the Google consent screen.' : err)}`,
-    );
+  if (err) return oauthFailure(c, err === 'access_denied' ? 'consent_denied' : 'consent_failed');
   if (!row || !code || Date.now() - row.created_at > 15 * 60 * 1000) {
-    return c.redirect(
-      '/admin/drive?error=' + encodeURIComponent('The connection attempt expired. Please try again.'),
-    );
+    return oauthFailure(c, 'state_invalid');
   }
+  let stage: OAuthFailureCode = 'token_exchange_failed';
   try {
     const tokens = await exchangeCode(c.env, c.req.url, code, row.code_verifier);
     if (!tokens.scope.split(' ').includes(DRIVE_SCOPE)) {
-      return c.redirect(
-        '/admin/drive?error=' +
-          encodeURIComponent(
-            'Drive read access was not granted. Tick the Drive permission on the consent screen.',
-          ),
-      );
+      return oauthFailure(c, 'drive_scope_missing');
     }
+    stage = 'connection_save_failed';
     await storeConnection(c.env, tokens);
     return c.redirect('/admin/drive?connected=1');
   } catch (e) {
-    return c.redirect(
-      '/admin/drive?error=' + encodeURIComponent(e instanceof Error ? e.message : 'Connection failed.'),
-    );
+    return oauthFailure(c, e instanceof DriveError && e.callbackCode ? e.callbackCode : stage, e);
   }
 });
 

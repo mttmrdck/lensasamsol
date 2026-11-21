@@ -1,5 +1,7 @@
 import type { Env } from './env';
 import { decryptSecret, encryptSecret } from './crypto';
+import type { OAuthFailureCode } from '../shared/oauth';
+import { boundedImageBody, MAX_IMAGE_SOURCE_BYTES } from './image-delivery';
 
 /**
  * Google OAuth + Drive v3 client.
@@ -28,9 +30,29 @@ export class DriveError extends Error {
       'not_connected' | 'auth' | 'not_found' | 'forbidden' | 'rate_limited' | 'upstream' | 'config',
     message: string,
     public status = 0,
+    public callbackCode?: OAuthFailureCode,
+    public redirectLocationPresent?: boolean,
   ) {
     super(message);
   }
+}
+
+/** Workers rejects redirect:error before sending a request. Keep the no-redirect policy explicitly. */
+async function googleFetch(url: string | URL, init: RequestInit): Promise<Response> {
+  const res = await fetch(url, { ...init, redirect: 'manual' });
+  if (res.status >= 300 && res.status < 400) {
+    // Read presence only; never follow, log, return, or retain a potentially sensitive destination.
+    const hasLocation = res.headers.has('location');
+    await res.body?.cancel();
+    throw new DriveError(
+      'upstream',
+      'Google returned an unexpected redirect.',
+      res.status,
+      'token_exchange_redirect',
+      hasLocation,
+    );
+  }
+  return res;
 }
 
 export function redirectUri(env: Env, requestUrl: string): string {
@@ -63,7 +85,7 @@ interface TokenResponse {
 }
 
 export async function exchangeCode(env: Env, requestUrl: string, code: string, verifier: string) {
-  const res = await fetch(TOKEN_URL, {
+  const res = await googleFetch(TOKEN_URL, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -74,12 +96,12 @@ export async function exchangeCode(env: Env, requestUrl: string, code: string, v
       grant_type: 'authorization_code',
       code_verifier: verifier,
     }),
-    redirect: 'error', signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(15000),
   });
   const data = (await res.json()) as TokenResponse;
   if (!res.ok || !data.access_token)
-    throw new DriveError('auth', 'Google could not complete authorization. Start a new connection attempt.');
-  if (!Number.isFinite(data.expires_in) || data.expires_in <= 60 || typeof data.scope !== 'string') throw new DriveError('auth','Google returned an invalid token response.');
+    throw new DriveError('auth', 'Google could not complete authorization. Start a new connection attempt.', res.status, 'token_exchange_failed');
+  if (!Number.isFinite(data.expires_in) || data.expires_in <= 60 || typeof data.scope !== 'string') throw new DriveError('auth','Google returned an invalid token response.', res.status, 'token_exchange_failed');
   let email: string | null = null;
   if (data.id_token) {
     // id_token came straight from Google's token endpoint over TLS (OIDC §3.1.3.7), so we only decode it.
@@ -90,7 +112,7 @@ export async function exchangeCode(env: Env, requestUrl: string, code: string, v
       email = null;
     }
   }
-  if (env.GOOGLE_ALLOWED_EMAIL && email?.toLowerCase() !== env.GOOGLE_ALLOWED_EMAIL.trim().toLowerCase()) throw new DriveError('forbidden','Connect the Google Drive account configured for this studio.');
+  if (env.GOOGLE_ALLOWED_EMAIL && email?.toLowerCase() !== env.GOOGLE_ALLOWED_EMAIL.trim().toLowerCase()) throw new DriveError('forbidden','Connect the Google Drive account configured for this studio.', 0, 'google_identity_failed');
   return { ...data, email };
 }
 
@@ -99,27 +121,50 @@ export async function storeConnection(env: Env, t: Awaited<ReturnType<typeof exc
     throw new DriveError(
       'auth',
       'Google did not return a refresh token. Remove the app at myaccount.google.com/permissions and connect again.',
+      0,
+      'refresh_token_missing',
     );
   }
   const key = env.TOKEN_ENCRYPTION_KEY!;
   const now = new Date().toISOString();
-  await env.DB.prepare(
-    `INSERT INTO google_connections (id, email, scopes, refresh_token_enc, access_token_enc, access_expires_at, connected_at, last_checked_at, last_error)
+  let refreshEncrypted: string, accessEncrypted: string;
+  try {
+    refreshEncrypted = await encryptSecret(t.refresh_token, key);
+    accessEncrypted = await encryptSecret(t.access_token, key);
+  } catch {
+    throw new DriveError(
+      'config',
+      'Could not encrypt the Google connection.',
+      0,
+      'token_encryption_failed',
+    );
+  }
+  try {
+    await env.DB.prepare(
+      `INSERT INTO google_connections (id, email, scopes, refresh_token_enc, access_token_enc, access_expires_at, connected_at, last_checked_at, last_error)
      VALUES (1, ?, ?, ?, ?, ?, ?, ?, NULL)
      ON CONFLICT(id) DO UPDATE SET email=excluded.email, scopes=excluded.scopes, refresh_token_enc=excluded.refresh_token_enc,
        access_token_enc=excluded.access_token_enc, access_expires_at=excluded.access_expires_at, connected_at=excluded.connected_at,
        last_checked_at=excluded.last_checked_at, last_error=NULL`,
-  )
-    .bind(
-      t.email,
-      t.scope,
-      await encryptSecret(t.refresh_token, key),
-      await encryptSecret(t.access_token, key),
-      Date.now() + (t.expires_in - 60) * 1000,
-      now,
-      now,
     )
-    .run();
+      .bind(
+        t.email,
+        t.scope,
+        refreshEncrypted,
+        accessEncrypted,
+        Date.now() + (t.expires_in - 60) * 1000,
+        now,
+        now,
+      )
+      .run();
+  } catch {
+    throw new DriveError(
+      'upstream',
+      'Could not save the Google connection.',
+      0,
+      'connection_save_failed',
+    );
+  }
   memo = null;
 }
 
@@ -161,7 +206,7 @@ export async function getAccessToken(env: Env): Promise<string> {
     return memo.token;
   }
   const refresh = await decryptSecret(row.refresh_token_enc, key);
-  const res = await fetch(TOKEN_URL, {
+  const res = await googleFetch(TOKEN_URL, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -170,7 +215,7 @@ export async function getAccessToken(env: Env): Promise<string> {
       refresh_token: refresh,
       grant_type: 'refresh_token',
     }),
-    redirect: 'error', signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(15000),
   });
   const data = (await res.json()) as TokenResponse;
   if (!res.ok || !data.access_token) {
@@ -203,11 +248,11 @@ export async function disconnect(env: Env): Promise<void> {
   if (row && env.TOKEN_ENCRYPTION_KEY) {
     try {
       const refresh = await decryptSecret(row.refresh_token_enc, env.TOKEN_ENCRYPTION_KEY);
-      await fetch('https://oauth2.googleapis.com/revoke', {
+      await googleFetch('https://oauth2.googleapis.com/revoke', {
         method: 'POST',
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ token: refresh }),
-        redirect:'error', signal:AbortSignal.timeout(10000),
+        signal:AbortSignal.timeout(10000),
       });
     } catch {
       // Revocation is best-effort; the local credential is deleted regardless.
@@ -231,7 +276,7 @@ export async function driveGet<T>(
     const token = await getAccessToken(env);
     const headers: Record<string, string> = { authorization: `Bearer ${token}` };
     if (resourceKeys) headers['x-goog-drive-resource-keys'] = resourceKeys;
-    const res = await fetch(url, { headers, redirect:'error', signal:AbortSignal.timeout(15000) });
+    const res = await googleFetch(url, { headers, signal:AbortSignal.timeout(15000) });
     if (res.ok) return (await res.json()) as T;
     const body = (await res.json().catch(() => ({}))) as {
       error?: { message?: string; errors?: Array<{ reason?: string }> };
@@ -341,33 +386,65 @@ export function orientedDims(f: DriveFile): { w: number; h: number; known: boole
   return rot % 2 === 1 ? { w: h, h: w, known: true } : { w, h, known: true };
 }
 
-/** Fetches a Drive-rendered preview (thumbnail service, oriented) at a bounded long-edge size. */
+/** Fetch an authorized, bounded derivative. Originals never form the browser response. */
 export async function fetchDrivePreview(
   env: Env,
   fileId: string,
   resourceKey: string | null,
-  _longEdge: number,
+  longEdge: number,
 ) {
   const rk = resourceKey ? `${fileId}/${resourceKey}` : undefined;
-  const f = await driveGet<DriveFile>(
+  const f = await driveGet<DriveFile & { size?: string; capabilities?: { canDownload?: boolean } }>(
     env,
     `/files/${encodeURIComponent(fileId)}`,
-    { fields: 'thumbnailLink,version', supportsAllDrives: 'true' },
+    { fields: 'thumbnailLink,version,mimeType,size,capabilities(canDownload)', supportsAllDrives: 'true' },
     rk,
   );
+  const token = await getAccessToken(env);
+  if (env.IMAGES && f.capabilities?.canDownload === true &&
+      ['image/jpeg', 'image/png', 'image/webp'].includes(f.mimeType) &&
+      Number(f.size) > 0 && Number(f.size) <= MAX_IMAGE_SOURCE_BYTES) {
+    const abort = new AbortController();
+    try {
+      const headers: Record<string, string> = { authorization: `Bearer ${token}` };
+      if (rk) headers['x-goog-drive-resource-keys'] = rk;
+      const mediaUrl = new URL(`${DRIVE}/files/${encodeURIComponent(fileId)}`);
+      mediaUrl.searchParams.set('alt', 'media');
+      mediaUrl.searchParams.set('supportsAllDrives', 'true');
+      const media = await googleFetch(mediaUrl, { headers,
+        signal: AbortSignal.any([abort.signal, AbortSignal.timeout(20000)]) });
+      const source = boundedImageBody(media, MAX_IMAGE_SOURCE_BYTES);
+      const size = Math.min(2560, Math.max(1, longEdge));
+      const output = await env.IMAGES.input(source).transform({ width: size, height: size, fit: 'scale-down' })
+        .output({ format: 'image/webp', quality: size > 1600 ? 88 : 84, anim: false });
+      const transformed = output.response();
+      if (transformed.headers.get('content-type')?.split(';')[0] !== 'image/webp') {
+        void transformed.body?.cancel().catch(() => {});
+        throw new Error('Unexpected derivative format');
+      }
+      // A generated derivative is the only media response exposed to the client.
+      const body = boundedImageBody(transformed);
+      return { res: new Response(body, { headers: { 'content-type': 'image/webp' } }),
+        version: f.version ?? '0', quality: 'transformed' as const };
+    } catch {
+      abort.abort();
+      // Controlled degradation: a documented thumbnail, never an unbounded original or arbitrary URL.
+    }
+  }
   if (!f.thumbnailLink) throw new DriveError('not_found', 'Google Drive has no preview for this file yet.');
-  // Use the documented thumbnailLink verbatim. No undocumented size suffix or original-file proxy.
+  // Thumbnail URLs are short-lived and their resolution is not a supported resizing interface.
   const u = new URL(f.thumbnailLink);
   if (u.protocol !== 'https:' || u.username || u.password || (u.port && u.port !== '443') || !/\.googleusercontent\.com$|\.google\.com$/.test(u.hostname)) {
     throw new DriveError('upstream', 'Unexpected thumbnail host.');
   }
-  const token = await getAccessToken(env);
   const res = await fetch(u, { headers: { authorization: `Bearer ${token}` }, redirect:'manual', signal:AbortSignal.timeout(15000) });
-  if (!res.ok)
+  if (!res.ok) {
+    await res.body?.cancel().catch(() => {});
     throw new DriveError(
       res.status === 404 ? 'not_found' : 'upstream',
       `Preview fetch failed (${res.status}).`,
       res.status,
     );
-  return { res, version: f.version ?? '0' };
+  }
+  return { res, version: f.version ?? '0', quality: 'thumbnail-fallback' as const };
 }
