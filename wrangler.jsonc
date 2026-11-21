@@ -95,10 +95,11 @@
       "name": "lensasamsol",
       "workers_dev": true,
       "preview_urls": false,
+      "images": { "binding": "IMAGES" },
       "vars": {
         "APP_ENV": "production",
         "DEMO_MODE": "false",
-        "PUBLIC_ORIGIN": "https://lensasamsol.zafranakif74.workers.dev"
+        "PUBLIC_ORIGIN": "https://lensasamsol.lnoa.workers.dev"
       },
       "secrets": {
         "required": [
@@ -113,7 +114,7 @@
         {
           "binding": "DB",
           "database_name": "lensasamsol-production",
-          "database_id": "00000000-0000-0000-0000-000000000000",
+          "database_id": "b95c944e-06bf-46a5-ba53-902f562e05f2",
           "migrations_dir": "migrations"
         }
       ]
