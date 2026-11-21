@@ -26,7 +26,7 @@ for (const key of ['coast', 'archive']) {
       const first = page.locator('[data-testid="photo-grid"] .g-tile').first();
       await expect(first).toHaveAttribute('data-photo-id', data.collection.coverPhotoId!);
       const box = await first.boundingBox();
-      expect(box!.y).toBeLessThan(width >= 1100 ? 40 : 300);
+      expect(box!.y).toBeLessThan(width >= 1100 ? 120 : 300);
       const ar = data.collection.cover!.w / data.collection.cover!.h;
       expect(Math.abs(box!.width / box!.height - ar)).toBeLessThan(0.02);
       expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);

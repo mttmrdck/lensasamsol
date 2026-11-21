@@ -208,8 +208,11 @@ export function GalleryRenderer(props: GalleryRendererProps) {
         <div inert={activeIndex >= 0 || undefined}>
           {folio ? (
             <div className="g-folio">
-              <aside className="g-folio-info" aria-label="About this gallery">
+              <header className="g-folio-bar">
                 <span className="g-folio-mark">{studio.name}</span>
+                {mode === 'public' && <DownloadAll variant="bar" photos={sourcePhotos} title={collection.title} />}
+              </header>
+              <aside className="g-folio-info" aria-label="About this gallery">
                 <div className="g-folio-about">
                   <h1 className="g-folio-title">{collection.title}</h1>
                   {facts.length > 0 && (
@@ -224,7 +227,6 @@ export function GalleryRenderer(props: GalleryRendererProps) {
                     <p className="g-folio-desc">{descriptionText}</p>
                   )}
                 </div>
-                {mode === 'public' && <DownloadAll photos={sourcePhotos} title={collection.title} />}
                 <div className="g-folio-links">
                   {folderLink && (
                     <a href={collection.folderUrl!} target="_blank" rel="noopener noreferrer">
