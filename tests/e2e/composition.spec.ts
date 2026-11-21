@@ -42,6 +42,7 @@ test('composition draft keeps text and cover private until published; undo and m
       'aria-pressed',
       'true',
     );
+    await page.getByRole('tab', { name: 'Cover', exact: true }).click();
     await page.getByLabel('Gallery title override').fill('A Private Monograph');
     await page.getByLabel('Gallery subtitle', { exact: true }).fill('An afternoon by the water');
     const selected = before.photos[2].id;
@@ -57,9 +58,11 @@ test('composition draft keeps text and cover private until published; undo and m
     expect(live.collection.title).toBe(before.collection.title);
     expect(live.collection.coverPhotoId).toBe(before.collection.coverPhotoId);
     await page.reload();
+    await page.getByRole('tab', { name: 'Cover', exact: true }).click();
     await expect(page.getByLabel('Gallery subtitle', { exact: true })).toHaveValue(
       'An afternoon by the water',
     );
+    await page.getByRole('tab', { name: 'Presets', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Portrait Story', exact: true })).toHaveAttribute(
       'aria-pressed',
       'true',
@@ -238,6 +241,7 @@ test('clearing saved introduction overrides previews original metadata; legacy l
     await login(page);
     await page.goto(`/admin/collections/${id}/design`);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Saved draft title');
+    await page.getByRole('tab', { name: 'Cover', exact: true }).click();
     await page.getByLabel('Gallery title override').fill('');
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(before.title);
     await page.getByLabel('Gallery description override').fill('');
@@ -248,6 +252,7 @@ test('clearing saved introduction overrides previews original metadata; legacy l
     await expect.poll(() => leadPhoto(page)).not.toBe(cover);
     await page.getByRole('tab', { name: 'Layout', exact: true }).click();
     await page.getByRole('radio', { name: 'Columns', exact: true }).click();
+    await page.getByRole('tab', { name: 'Cover', exact: true }).click();
     await expect(page.getByLabel('Gallery subtitle', { exact: true })).toHaveValue('Keep this subtitle');
   } finally {
     await adminJson(request, 'PUT', `/api/admin/collections/${id}/style`, { style: before.styleDraft });

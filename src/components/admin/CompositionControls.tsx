@@ -37,23 +37,15 @@ function TemplateThumbnail({ id, style }: { id: TemplateId; style: StyleConfig }
     </svg>
   );
 }
-export function CompositionControls({
-  style,
-  photos,
-  coverId,
-  onChange,
-  allowContent = true,
-}: {
+type Composition = NonNullable<StyleConfig['composition']>;
+interface ControlProps {
   style: StyleConfig;
-  photos: PublicPhoto[];
-  coverId: string | null;
   onChange: (s: StyleConfig, key?: string) => void;
-  allowContent?: boolean;
-}) {
-  const recommendation = useMemo(() => recommendTemplate(photos), [photos]);
-  const covers = useMemo(() => rankCovers(photos).slice(0, 6), [photos]);
-  const [applied, setApplied] = useState(false);
-  const patch = (value: Partial<NonNullable<StyleConfig['composition']>>, key = 'composition') =>
+}
+
+/** Shared by the three panels below: merges a composition patch into the style. */
+function useCompositionPatch({ style, onChange }: ControlProps) {
+  return (value: Partial<Composition>, key = 'composition') =>
     onChange(
       {
         ...style,
@@ -66,12 +58,23 @@ export function CompositionControls({
       },
       key,
     );
+}
+
+/** Presets tab: Auto Arrange and the gallery layout templates. */
+export function ArrangeControls({
+  style,
+  photos,
+  coverId,
+  onChange,
+}: ControlProps & { photos: PublicPhoto[]; coverId: string | null }) {
+  const recommendation = useMemo(() => recommendTemplate(photos), [photos]);
+  const [applied, setApplied] = useState(false);
   const choose = (id: TemplateId) => {
     onChange(arrangeStyle(style, photos, coverId, id), 'template');
     setApplied(false);
   };
   return (
-    <div className="flex flex-col gap-4 border-b border-line p-4">
+    <div className="flex flex-col gap-3">
       <Button
         variant="primary"
         disabled={!photos.length}
@@ -83,107 +86,40 @@ export function CompositionControls({
         <Sparkles size={15} aria-hidden="true" />
         Auto Arrange
       </Button>
-      <p className="text-[13px] leading-5 text-slate" role="status">
+      <p className="text-[12px] leading-4 text-slate" role="status">
         {applied ? 'Applied' : 'Recommended'}: {TEMPLATES.find((t) => t.id === recommendation.id)?.name}.{' '}
         {recommendation.reason}
         {applied && ' Review the preview, then save or publish when ready.'}
       </p>
       <div className="grid grid-cols-2 gap-2" aria-label="Composition templates">
-        {TEMPLATES.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            aria-pressed={style.composition?.useTemplate !== false && style.composition?.template === t.id}
-            onClick={() => choose(t.id)}
-            className={`overflow-hidden rounded-ui border text-left ${style.composition?.useTemplate !== false && style.composition?.template === t.id ? 'border-ink ring-1 ring-ink' : 'border-line hover:border-ink'}`}
-            title={t.note}
-          >
-            <TemplateThumbnail id={t.id} style={style} />
-            <span className="block px-2 py-2 text-[13px] leading-4">{t.name}</span>
-          </button>
-        ))}
-      </div>
-      {allowContent && (
-        <>
-          <label className="text-[13px] font-medium">
-            Gallery title
-            <Input
-              aria-label="Gallery title override"
-              value={style.composition?.title ?? ''}
-              maxLength={140}
-              placeholder="Use the existing public title"
-              onChange={(e) =>
-                patch({ title: e.target.value.trim() ? e.target.value : undefined }, 'composition.title')
-              }
-            />
-          </label>
-          <label className="text-[13px] font-medium">
-            Subtitle
-            <Input
-              aria-label="Gallery subtitle"
-              value={style.composition?.subtitle ?? ''}
-              maxLength={240}
-              placeholder="A place, a season, a story"
-              onChange={(e) => patch({ subtitle: e.target.value }, 'composition.subtitle')}
-            />
-          </label>
-          <label className="text-[13px] font-medium">
-            Description
-            <textarea
-              aria-label="Gallery description override"
-              className="mt-1 min-h-20 w-full rounded-ui border border-line bg-surface px-3 py-2 text-[14px] font-normal"
-              maxLength={2000}
-              value={style.composition?.description ?? ''}
-              placeholder="Use the existing public description"
-              onChange={(e) => patch({ description: e.target.value || undefined }, 'composition.description')}
-            />
-          </label>
-          <label className="text-[13px] font-medium">
-            Highlighted photograph
-            <select
-              aria-label="Highlighted photograph"
-              className="mt-1 h-10 w-full rounded-ui border border-line bg-surface px-2 text-[14px] font-normal"
-              value={style.composition?.coverId === null ? '' : (style.composition?.coverId ?? coverId ?? '')}
-              onChange={(e) => patch({ coverId: e.target.value || null }, 'composition.cover')}
+        {TEMPLATES.map((t) => {
+          const active = style.composition?.useTemplate !== false && style.composition?.template === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              aria-pressed={active}
+              onClick={() => choose(t.id)}
+              className={`overflow-hidden rounded-ui border text-left ${active ? 'border-ink ring-1 ring-ink' : 'border-line hover:border-ink'}`}
+              title={t.note}
             >
-              <option value="">Automatic metadata recommendation</option>
-              {photos.map((p, i) => (
-                <option key={p.id} value={p.id}>
-                  {p.filename ?? `Photograph ${i + 1}`}
-                </option>
-              ))}
-            </select>
-          </label>
-          {!!covers.length && (
-            <div>
-              <p className="mb-2 text-[12px] text-slate">
-                Suggested covers · featured status, dimensions and order
-              </p>
-              <div className="grid grid-cols-3 gap-2">
-                {covers.map((p, i) => (
-                  <button
-                    type="button"
-                    key={p.id}
-                    aria-label={`Use suggested cover ${i + 1}`}
-                    aria-pressed={(style.composition?.coverId ?? coverId) === p.id}
-                    onClick={() => patch({ coverId: p.id }, 'composition.cover')}
-                    className="overflow-hidden border border-line aria-pressed:ring-2 aria-pressed:ring-ink"
-                  >
-                    <img
-                      src={imgUrl(p.id, 's')}
-                      alt=""
-                      loading="lazy"
-                      className="aspect-[4/3] w-full object-contain bg-subtle"
-                    />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
-      )}
-      <div>
-        <p className="mb-2 text-[13px] font-medium">Density</p>
+              <TemplateThumbnail id={t.id} style={style} />
+              <span className="block px-2 py-2 text-[13px] leading-4">{t.name}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** Layout tab: density, photo order and the template-specific switches. */
+export function OrderingControls({ style, onChange }: ControlProps) {
+  const patch = useCompositionPatch({ style, onChange });
+  return (
+    <>
+      <div className="flex flex-col gap-2">
+        <h3 className="text-[12px] font-semibold text-ink">Density</h3>
         <Segmented
           label="Layout density"
           value={style.layout.gap <= 8 ? 'compact' : style.layout.gap >= 18 ? 'spacious' : 'balanced'}
@@ -207,7 +143,7 @@ export function CompositionControls({
         style.composition.useTemplate !== false &&
         (style.composition.template === 'editorial-signature' ||
           style.composition.template === 'cinematic-archive') && (
-          <>
+          <div className="flex flex-col gap-3">
             {style.composition.template === 'editorial-signature' && (
               <Switch
                 label="Editorial clusters"
@@ -222,24 +158,115 @@ export function CompositionControls({
               checked={style.composition.emphasizeFeatured !== false}
               onChange={(emphasizeFeatured) => patch({ emphasizeFeatured })}
             />
-          </>
+          </div>
         )}
+      <div className="flex flex-col gap-1">
+        <label className="text-[13px] font-medium">
+          Photo order
+          <select
+            aria-label="Photo order"
+            value={style.composition?.order ?? 'source'}
+            onChange={(e) => patch({ order: e.target.value as 'source' | 'filename' }, 'composition.order')}
+            className="mt-1 h-10 w-full rounded-ui border border-line bg-surface px-2 text-[14px] font-normal"
+          >
+            <option value="source">Existing sequence (default)</option>
+            <option value="filename">Filename, natural order</option>
+          </select>
+        </label>
+        <p className="text-[12px] leading-4 text-slate">
+          Assignments and featured photos are changed in Manage Photos.
+        </p>
+      </div>
+    </>
+  );
+}
+
+/** Cover tab: the gallery introduction and the highlighted photograph (per-gallery content only). */
+export function CoverContentControls({
+  style,
+  photos,
+  coverId,
+  onChange,
+}: ControlProps & { photos: PublicPhoto[]; coverId: string | null }) {
+  const patch = useCompositionPatch({ style, onChange });
+  const covers = useMemo(() => rankCovers(photos).slice(0, 6), [photos]);
+  return (
+    <div className="flex flex-col gap-3">
       <label className="text-[13px] font-medium">
-        Photo order
+        Gallery title
+        <Input
+          aria-label="Gallery title override"
+          value={style.composition?.title ?? ''}
+          maxLength={140}
+          placeholder="Use the existing public title"
+          onChange={(e) =>
+            patch({ title: e.target.value.trim() ? e.target.value : undefined }, 'composition.title')
+          }
+        />
+      </label>
+      <label className="text-[13px] font-medium">
+        Subtitle
+        <Input
+          aria-label="Gallery subtitle"
+          value={style.composition?.subtitle ?? ''}
+          maxLength={240}
+          placeholder="A place, a season, a story"
+          onChange={(e) => patch({ subtitle: e.target.value }, 'composition.subtitle')}
+        />
+      </label>
+      <label className="text-[13px] font-medium">
+        Description
+        <textarea
+          aria-label="Gallery description override"
+          className="mt-1 min-h-20 w-full rounded-ui border border-line bg-surface px-3 py-2 text-[14px] font-normal"
+          maxLength={2000}
+          value={style.composition?.description ?? ''}
+          placeholder="Use the existing public description"
+          onChange={(e) => patch({ description: e.target.value || undefined }, 'composition.description')}
+        />
+      </label>
+      <label className="text-[13px] font-medium">
+        Highlighted photograph
         <select
-          aria-label="Photo order"
-          value={style.composition?.order ?? 'source'}
-          onChange={(e) => patch({ order: e.target.value as 'source' | 'filename' }, 'composition.order')}
+          aria-label="Highlighted photograph"
           className="mt-1 h-10 w-full rounded-ui border border-line bg-surface px-2 text-[14px] font-normal"
+          value={style.composition?.coverId === null ? '' : (style.composition?.coverId ?? coverId ?? '')}
+          onChange={(e) => patch({ coverId: e.target.value || null }, 'composition.cover')}
         >
-          <option value="source">Existing sequence (default)</option>
-          <option value="filename">Filename, natural order</option>
+          <option value="">Automatic metadata recommendation</option>
+          {photos.map((p, i) => (
+            <option key={p.id} value={p.id}>
+              {p.filename ?? `Photograph ${i + 1}`}
+            </option>
+          ))}
         </select>
       </label>
-      <p className="text-[12px] leading-5 text-slate">
-        Existing sequence preserved unless you choose filename order. Change assignments and featured photos
-        in Manage Photos.
-      </p>
+      {!!covers.length && (
+        <div>
+          <p className="mb-2 text-[12px] text-slate">
+            Suggested covers · featured status, dimensions and order
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {covers.map((p, i) => (
+              <button
+                type="button"
+                key={p.id}
+                aria-label={`Use suggested cover ${i + 1}`}
+                aria-pressed={(style.composition?.coverId ?? coverId) === p.id}
+                onClick={() => patch({ coverId: p.id }, 'composition.cover')}
+                className="overflow-hidden border border-line aria-pressed:ring-2 aria-pressed:ring-ink"
+              >
+                <img
+                  src={imgUrl(p.id, 's')}
+                  alt=""
+                  loading="lazy"
+                  className="aspect-[4/3] w-full object-contain bg-subtle"
+                />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

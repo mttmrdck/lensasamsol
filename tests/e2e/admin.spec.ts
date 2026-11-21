@@ -143,8 +143,9 @@ test.describe('admin', () => {
   test('editor: folder button locked for shared folders; mobile preview + undo work', async ({ page }) => {
     await login(page);
     await page.goto('/admin/collections/col_demo_highlands/design');
-    await page.getByRole('tab', { name: 'Colour' }).click();
+    await page.getByRole('tab', { name: 'Layout' }).click(); // Drive buttons live with the photos
     await expect(page.getByRole('switch', { name: /Whole-folder button/ })).toBeDisabled();
+    await page.getByRole('tab', { name: 'Colour' }).click();
     await page.getByRole('radio', { name: /Mobile/ }).click();
     await expect.poll(async () => (await page.getByTestId('preview-frame').boundingBox())?.width).toBe(390);
     await page
