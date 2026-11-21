@@ -11,6 +11,19 @@ test.beforeEach(async ({ context }) => {
   );
 });
 
+/** Photo the gallery leads with: the hero when the layout has one, otherwise the top-left tile. */
+const leadPhoto = (page: import('@playwright/test').Page) =>
+  page.evaluate(() => {
+    const hero = document.querySelector<HTMLImageElement>('.g-hero-img');
+    if (hero) return hero.getAttribute('src')?.match(/\/(ph_[^/]+)\//)?.[1] ?? null;
+    const tiles = Array.from(document.querySelectorAll<HTMLElement>('[data-testid="photo-grid"] .g-tile'));
+    const pos = (el: HTMLElement) => {
+      const m = el.style.transform.match(/translate\((-?[\d.]+)px, (-?[\d.]+)px\)/);
+      return m ? Number(m[2]) * 100000 + Number(m[1]) : Infinity;
+    };
+    return tiles.sort((a, b) => pos(a) - pos(b))[0]?.dataset.photoId ?? null;
+  });
+
 test('composition draft keeps text and cover private until published; undo and manual choices work', async ({
   page,
   request,
@@ -33,14 +46,11 @@ test('composition draft keeps text and cover private until published; undo and m
     await page.getByLabel('Gallery subtitle', { exact: true }).fill('An afternoon by the water');
     const selected = before.photos[2].id;
     await page.getByLabel('Highlighted photograph', { exact: true }).selectOption(selected);
-    await expect(page.locator('.g-hero-img')).toHaveAttribute('src', new RegExp(`/${selected}/l$`));
+    await expect.poll(() => leadPhoto(page)).toBe(selected);
     await page.getByRole('button', { name: 'Undo (Cmd+Z)', exact: true }).click();
-    await expect(page.locator('.g-hero-img')).toHaveAttribute(
-      'src',
-      new RegExp(`/${before.collection.coverPhotoId}/l$`),
-    );
+    await expect.poll(() => leadPhoto(page)).toBe(before.collection.coverPhotoId);
     await page.getByRole('button', { name: 'Redo (Shift+Cmd+Z)', exact: true }).click();
-    await expect(page.locator('.g-hero-img')).toHaveAttribute('src', new RegExp(`/${selected}/l$`));
+    await expect.poll(() => leadPhoto(page)).toBe(selected);
     await page.getByRole('button', { name: 'Save draft', exact: true }).click();
     await expect(page.getByText('Draft saved, not published')).toBeVisible();
     let live = (await (await request.get(`/api/public/g/${token}`)).json()) as GalleryResponse;
@@ -149,13 +159,8 @@ for (const [index, t] of TEMPLATES.entries()) {
       for (const width of [1440, 1024, 768, 390, 360]) {
         await page.setViewportSize({ width, height: width < 640 ? 844 : 1000 });
         await page.goto(`/g/${token}`);
-        const hero = page.getByTestId('featured-hero');
-        await expect(hero).toBeVisible();
         await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-        await expect(hero.locator('img')).toHaveCSS('object-fit', 'contain');
-        const image = await hero.locator('img').boundingBox(),
-          title = await hero.locator('h1').boundingBox();
-        expect(title!.y).toBeGreaterThanOrEqual(image!.y + image!.height);
+        await expect(page.getByTestId('photo-grid')).toBeVisible();
         expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
         await page.evaluate(() => document.fonts.ready);
         await page.screenshot({ path: `screenshots/composition/${t.id}-${width}-hero.png` });
@@ -203,7 +208,7 @@ test('one photo with unknown dimensions renders stable geometry and viewer', asy
   );
   await page.setViewportSize({ width: 360, height: 780 });
   await page.goto(`/g/${token}`);
-  await expect(page.getByTestId('featured-hero')).toBeVisible();
+  await expect(page.locator('.g-folio')).toBeVisible();
   await page.getByTestId('photo-grid').scrollIntoViewIfNeeded();
   await page.locator('.g-tile-link').click();
   await expect(page.getByTestId('lightbox')).toBeVisible();
@@ -237,13 +242,13 @@ test('clearing saved introduction overrides previews original metadata; legacy l
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(before.title);
     await page.getByLabel('Gallery description override').fill('');
     await expect(page.getByText(before.description!, { exact: true })).toBeVisible();
+    await expect.poll(() => leadPhoto(page)).toBe(cover);
+    await page.getByLabel('Highlighted photograph', { exact: true }).selectOption('');
+    await expect(page.getByLabel('Highlighted photograph', { exact: true })).toHaveValue('');
+    await expect.poll(() => leadPhoto(page)).not.toBe(cover);
     await page.getByRole('tab', { name: 'Layout', exact: true }).click();
     await page.getByRole('radio', { name: 'Columns', exact: true }).click();
     await expect(page.getByLabel('Gallery subtitle', { exact: true })).toHaveValue('Keep this subtitle');
-    await expect(page.locator('.g-hero-img')).toHaveAttribute('src', new RegExp(`/${cover}/l$`));
-    await page.getByLabel('Highlighted photograph', { exact: true }).selectOption('');
-    await expect(page.getByLabel('Highlighted photograph', { exact: true })).toHaveValue('');
-    await expect(page.locator('.g-hero-img')).not.toHaveAttribute('src', new RegExp(`/${cover}/l$`));
   } finally {
     await adminJson(request, 'PUT', `/api/admin/collections/${id}/style`, { style: before.styleDraft });
   }

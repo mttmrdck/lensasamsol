@@ -94,3 +94,28 @@ New composition designs use a natural, viewport-bounded highlighted photograph w
 ## Static client landing
 
 The current public and preview presentation removes split text panels, title overlays, Selected Moments, the Explore pill and the repeated sticky bar. One uncropped selected photograph leads directly into an aligned caption and the main gallery. All admin sources remain unchanged. See [the static landing report](docs/STATIC_LANDING.md) for compatibility notes, screenshots and validation.
+
+## Reference-driven overhaul (2026-11-21)
+
+Two approved references set the direction. They are never merged.
+
+**Studio (Reference A: dense collection manager).** Bright white workspace, 224px quiet rail, one sans family
+(Schibsted Grotesk), 24px page title, search beside the title, create action on the right. Collections are a
+4/3/2/2-column grid (xl/md/base) of 4:3 thumbnails with a 15px name, a status dot, photo count and date. Actions
+live in a menu (keyboard and touch reachable; the trigger is always visible on coarse pointers). Publishing and
+link regeneration stay on the gallery page so the named-gallery confirmation is never bypassed.
+
+**Public gallery (Reference B: editorial contact sheet).** Layout mode `folio`: a 224px sticky information column
+(wordmark, title, date, place, photograph count, description, private-link note) beside aspect-true columns
+(2/3/4/5 by width, 8px gutter). Photos keep the photographer's order; the selected cover leads and, when landscape
+on three or more columns, spans two columns as the single larger frame. Below 900px the column collapses into a
+compact header above the sheet and the notes move below it. No cards, borders, banner hero or slogans; only real
+collection data is shown. Saved galleries that still carry the untouched earlier default adopt folio; any gallery
+the photographer styled keeps its own layout, theme and type.
+
+**Type system.** Two families, both already shipped: Schibsted Grotesk (everything) and Geist Mono (the wordmark
+only). Both are open-licensed (SIL OFL) via Google Fonts. Young Serif was removed from the studio. The optional
+per-gallery pairings (serif and grotesk) remain available in the design editor.
+
+**Iris.** Starts fully covered, centred on the viewport, opens to clear every corner, no Skip control. The entrance
+now also plays for the folio default (previously gated off for `typographic` covers).

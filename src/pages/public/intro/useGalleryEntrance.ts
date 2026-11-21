@@ -86,7 +86,7 @@ export function useGalleryEntrance(
     started.current = true;
     const cover = data.collection.cover;
     const style = data.collection.style.cover.style;
-    if (!cover || style === 'typographic' || data.photos.length === 0) {
+    if (!cover || (style === 'typographic' && data.collection.style.layout.mode !== 'folio') || data.photos.length === 0) {
       setState('off');
       return;
     }
@@ -94,7 +94,7 @@ export function useGalleryEntrance(
     // Same src/srcset/sizes as the hero image, so the browser fetches and decodes the cover only once.
     const img = new Image();
     img.decoding = 'async';
-    const hero = document.querySelector<HTMLImageElement>('.g-hero-img');
+    const hero = document.querySelector<HTMLImageElement>('.g-hero-img, [data-testid="photo-grid"] .g-tile img');
     img.sizes = hero?.sizes || '100vw';
     img.srcset =
       hero?.srcset ||

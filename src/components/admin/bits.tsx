@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Link } from 'react-router';
-import { Check, Copy } from 'lucide-react';
+import { Link, useNavigate } from 'react-router';
+import { DropdownMenu } from 'radix-ui';
+import { Check, Copy, MoreHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 import type { AdminCollectionSummary } from '../../../shared/api';
-import { formatDate, imgUrl, relativeTime, srcSet } from '../../lib/format';
+import { formatDate, imgUrl, plural, relativeTime, srcSet } from '../../lib/format';
 import { Pill, cx } from '../ui';
 
 /** The one URL a client receives. It contains only the random share token: no name, slug or ID. */
@@ -90,61 +91,111 @@ export function CopyClientLinkButton({
   );
 }
 
+function statusLabel(c: Pick<AdminCollectionSummary, 'status' | 'syncStatus' | 'shareToken'>) {
+  if (c.syncStatus === 'error') return { text: 'Sync issue', dot: 'bg-err' };
+  if (c.syncStatus === 'syncing') return { text: 'Syncing', dot: 'bg-warn' };
+  if (c.status !== 'published') return { text: 'Draft', dot: 'bg-muted' };
+  return c.shareToken ? { text: 'Published', dot: 'bg-ok' } : { text: 'Link revoked', dot: 'bg-warn' };
+}
+
+const menuItem =
+  'flex h-9 cursor-pointer select-none items-center rounded-[4px] px-2.5 text-[13px] text-ink outline-none data-[highlighted]:bg-subtle data-[disabled]:cursor-not-allowed data-[disabled]:text-muted';
+
 export function CollectionCard({ c }: { c: AdminCollectionSummary }) {
+  const navigate = useNavigate();
+  const name = c.clientName ?? c.title;
+  const status = statusLabel(c);
+  const blocker = linkBlocker(c);
   return (
-    <article className="studio-collection group relative flex flex-col overflow-hidden border-b border-line transition-colors duration-200">
+    <article className="studio-collection group relative flex min-w-0 flex-col gap-2">
       <Link
         to={`/admin/collections/${c.id}`}
-        className="block focus-visible:outline-offset-[-2px]"
-        aria-label={`Open ${c.clientName ?? c.title}`}
+        className="flex min-w-0 flex-col gap-2 focus-visible:outline-offset-4"
+        aria-label={`Open ${name}`}
       >
-        <div className="relative aspect-[3/2] bg-placeholder">
+        <div className="relative aspect-[4/3] overflow-hidden bg-placeholder">
           {c.cover && (
             <img
               src={imgUrl(c.cover.id, 's')}
               srcSet={srcSet(c.cover.id, c.cover.w, c.cover.h)}
-              sizes="(min-width: 1280px) 22vw, (min-width: 768px) 40vw, 100vw"
+              sizes="(min-width: 1280px) 22vw, (min-width: 768px) 30vw, 46vw"
               alt=""
               loading="lazy"
               decoding="async"
               className="h-full w-full object-cover"
             />
           )}
-          <span className="absolute left-2.5 top-2.5">
-            <StatusPill c={c} />
-          </span>
         </div>
-        <div className="flex flex-col gap-0.5 px-4 pb-3 pt-3.5">
-          <p className="truncate text-[12px] font-medium text-slate">{c.clientName ?? 'No client name'}</p>
-          <h3 className="studio-collection-title truncate font-display text-[22px] tracking-[-0.025em] text-ink">{c.title}</h3>
-          <p className="tnum flex flex-wrap gap-x-3 text-[13px] text-slate [&>span]:whitespace-nowrap">
-            <span>{c.eventDate ? formatDate(c.eventDate, 'short') : 'No date'}</span>
-            <span>{c.photoCount.toLocaleString('en-GB')} photos</span>
-            {c.assignmentMode === 'selected' && <span>Selected</span>}
-            {c.source === 'demo' && <span className="text-muted">Demo</span>}
-          </p>
+        <div className="flex min-w-0 flex-col">
+          <h3 className="studio-collection-title truncate text-[15px] font-medium leading-5 text-ink">{c.title}</h3>
+          {c.clientName && <p className="truncate text-[12.5px] leading-4 text-slate">{c.clientName}</p>}
         </div>
       </Link>
-      <div className="mt-auto flex flex-col gap-1.5 border-t border-line p-2.5">
-        <CopyClientLinkButton c={c} className="w-full" />
-        <div className="grid grid-cols-2 gap-1.5">
-          <Link
-            to={`/admin/collections/${c.id}`}
-            className="inline-flex h-8 items-center justify-center whitespace-nowrap rounded-ui border border-line px-1 text-[12px] font-medium text-ink hover:bg-subtle"
-          >
-            Manage Photos
-          </Link>
-          <Link
-            to={`/admin/collections/${c.id}/design`}
-            className="inline-flex h-8 items-center justify-center whitespace-nowrap rounded-ui border border-line px-1 text-[12px] font-medium text-ink hover:bg-subtle"
-          >
-            Customize Design
-          </Link>
-        </div>
-        {c.hasUnpublishedStyle && (
-          <p className="px-0.5 text-[11px] text-warn">Design changes not published yet</p>
+      <p className="tnum flex min-w-0 items-center gap-1.5 text-[12.5px] leading-4 text-slate">
+        <span className={cx('h-2 w-2 shrink-0 rounded-full', status.dot)} aria-hidden="true" />
+        <span className="shrink-0">{status.text}</span>
+        <span aria-hidden="true">·</span>
+        <span className="shrink-0">{plural(c.photoCount, 'photo')}</span>
+        {c.eventDate && (
+          <>
+            <span aria-hidden="true">·</span>
+            <span className="truncate">{formatDate(c.eventDate, 'short')}</span>
+          </>
         )}
-      </div>
+      </p>
+      {c.hasUnpublishedStyle && <p className="text-[11.5px] text-warn">Design changes not published yet</p>}
+      <DropdownMenu.Root>
+        <DropdownMenu.Trigger asChild>
+          <button
+            type="button"
+            aria-label={`Actions for ${name}`}
+            className="absolute right-2 top-2 grid h-9 w-9 place-items-center rounded-full bg-surface/95 text-ink opacity-0 shadow-[0_1px_3px_rgba(0,0,0,0.18)] transition-opacity focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100 data-[state=open]:opacity-100 pointer-coarse:opacity-100"
+          >
+            <MoreHorizontal size={18} aria-hidden="true" />
+          </button>
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content
+            align="end"
+            sideOffset={6}
+            className="z-50 min-w-[210px] rounded-ui border border-line bg-surface p-1 shadow-[0_8px_24px_rgba(0,0,0,0.12)]"
+          >
+            <DropdownMenu.Item className={menuItem} onSelect={() => navigate(`/admin/collections/${c.id}`)}>
+              Manage photos
+            </DropdownMenu.Item>
+            <DropdownMenu.Item
+              className={menuItem}
+              onSelect={() => navigate(`/admin/collections/${c.id}/design`)}
+            >
+              Customize design
+            </DropdownMenu.Item>
+            <DropdownMenu.Item
+              className={menuItem}
+              onSelect={() => navigate(`/admin/collections/${c.id}/preview`)}
+            >
+              Preview client view
+            </DropdownMenu.Item>
+            <DropdownMenu.Separator className="my-1 h-px bg-line" />
+            <DropdownMenu.Item
+              className={menuItem}
+              disabled={!!blocker}
+              title={blocker ?? undefined}
+              onSelect={() => {
+                if (c.shareToken)
+                  void copyText(
+                    clientUrl(c.shareToken),
+                    'Client link copied. Paste it into your message to the client.',
+                  );
+              }}
+            >
+              Copy client link
+            </DropdownMenu.Item>
+            <DropdownMenu.Item className={menuItem} onSelect={() => navigate(`/admin/collections/${c.id}`)}>
+              {c.status === 'published' ? 'Unpublish or regenerate link' : 'Review and publish'}
+            </DropdownMenu.Item>
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Root>
     </article>
   );
 }
@@ -153,18 +204,22 @@ export function PageHeader({
   title,
   children,
   sub,
+  middle,
 }: {
   title: string;
   sub?: React.ReactNode;
   children?: React.ReactNode;
+  /** Sits beside the title (e.g. search). */
+  middle?: React.ReactNode;
 }) {
   return (
-    <div className="studio-page-header flex flex-col gap-4 border-b border-line pb-6 sm:flex-row sm:items-end sm:justify-between">
-      <div className="flex flex-col gap-1">
-        <h1 className="font-display text-[clamp(30px,3.5vw,48px)] leading-tight tracking-[-0.035em]">{title}</h1>
+    <div className="studio-page-header flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
+      <div className="flex min-w-0 flex-col">
+        <h1 className="text-[24px] font-semibold leading-8 tracking-[-0.02em]">{title}</h1>
         {sub && <p className="text-[13px] text-slate">{sub}</p>}
       </div>
-      {children && <div className="flex flex-wrap gap-2">{children}</div>}
+      {middle && <div className="min-w-0 sm:flex-1 sm:max-w-[360px]">{middle}</div>}
+      {children && <div className="flex flex-wrap gap-2 sm:ml-auto">{children}</div>}
     </div>
   );
 }

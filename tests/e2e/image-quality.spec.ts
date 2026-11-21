@@ -114,7 +114,7 @@ for (const device of [
         await page.unrouteAll({ behavior: 'wait' });
         await mockGallery(page, false, false, coverIndex);
         await page.goto(`/g/${token}`);
-        const image = page.locator('.g-hero-img');
+        const image = page.locator('[data-testid="photo-grid"] .g-tile img').first();
         await expect
           .poll(() => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0))
           .toBe(true);

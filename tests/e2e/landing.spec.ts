@@ -7,8 +7,9 @@ test.beforeEach(async ({ context }) => {
     () => ((window as unknown as { __LSG_NO_INTRO__: boolean }).__LSG_NO_INTRO__ = true),
   );
 });
-for (const key of ['coast', 'portraits', 'highlands', 'night', 'archive']) {
-  test(`static ${key} landing preserves selected cover and flows directly to the grid at five widths`, async ({
+// Galleries on the default style take the folio look; galleries the photographer styled keep their own.
+for (const key of ['coast', 'archive']) {
+  test(`folio ${key} landing leads with the selected cover and fills the sheet at five widths`, async ({
     page,
     request,
   }) => {
@@ -18,27 +19,20 @@ for (const key of ['coast', 'portraits', 'highlands', 'night', 'archive']) {
     for (const width of [1440, 1024, 768, 390, 360]) {
       await page.setViewportSize({ width, height: width < 640 ? 844 : 1000 });
       await page.goto(`/g/${token}`);
-      const hero = page.getByTestId('featured-hero');
-      await expect(hero).toBeVisible();
-      const image = hero.locator('img');
-      await expect(image).toHaveAttribute('src', new RegExp(`/${data.collection.coverPhotoId}/l$`));
-      await expect(image).toHaveCSS('object-fit', 'contain');
-      await expect(page.locator('.g-hero-text')).toHaveCSS('transition-duration', '0s');
-      await expect(page.locator('.g-hero-text')).toHaveCSS('transform', 'none');
-      await expect(page.locator('.g-bar, .g-split, [data-testid="selected-grid"]')).toHaveCount(0);
-      await expect(page.getByRole('heading', { name: /Selected moments|All photographs/i })).toHaveCount(0);
-      await expect(page.getByRole('button', { name: 'Explore the gallery' })).toHaveCount(0);
-      const im = await image.boundingBox(),
-        title = await hero.locator('h1').boundingBox(),
-        hr = await hero.boundingBox();
-      expect(title!.y).toBeGreaterThan(im!.y + im!.height);
-      expect(Math.abs(title!.x - im!.x)).toBeLessThan(1);
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      // No banner hero, no decorative slogan, no empty left column: the sheet starts under a compact header.
+      await expect(page.getByTestId('featured-hero')).toHaveCount(0);
+      await expect(page.getByText('A private photographic edition')).toHaveCount(0);
+      const first = page.locator('[data-testid="photo-grid"] .g-tile').first();
+      await expect(first).toHaveAttribute('data-photo-id', data.collection.coverPhotoId!);
+      const box = await first.boundingBox();
+      expect(box!.y).toBeLessThan(width >= 1100 ? 40 : 300);
       const ar = data.collection.cover!.w / data.collection.cover!.h;
-      expect(Math.abs(im!.width / im!.height - ar)).toBeLessThan(0.002);
-      const grid = await page.getByTestId('photo-grid').boundingBox();
-      expect(grid!.y - hr!.y - hr!.height).toBeGreaterThanOrEqual(20);
-      expect(grid!.y - hr!.y - hr!.height).toBeLessThanOrEqual(40);
+      expect(Math.abs(box!.width / box!.height - ar)).toBeLessThan(0.02);
       expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+      // Every tile is a distinct record.
+      const ids = await page.locator('.g-tile').evaluateAll((els) => els.map((e) => e.getAttribute('data-photo-id')));
+      expect(new Set(ids).size).toBe(ids.length);
       if (key === 'archive') {
         await page
           .getByTestId('photo-grid')
@@ -51,18 +45,16 @@ for (const key of ['coast', 'portraits', 'highlands', 'night', 'archive']) {
   });
 }
 
-test('live editor preview uses the same static opening and retains its inspector', async ({ page }) => {
+test('live editor preview renders the folio sheet and retains its inspector', async ({ page }) => {
   await login(page);
-  await page.goto('/admin/collections/col_demo_portraits/design');
+  await page.goto('/admin/collections/col_demo_coast/design');
   const frame = page.getByTestId('preview-frame');
-  await expect(frame.getByTestId('featured-hero')).toBeVisible();
+  await expect(frame.locator('.g-folio')).toBeVisible();
   await expect(page.getByRole('complementary', { name: 'Design inspector' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Auto Arrange', exact: true })).toBeVisible();
-  await expect(frame.locator('.g-bar, .g-split, [data-testid="selected-grid"]')).toHaveCount(0);
   await page.getByRole('radio', { name: /Mobile/ }).click();
   await expect.poll(async () => (await frame.boundingBox())!.width).toBe(390);
-  const image = await frame.locator('.g-hero-img').boundingBox(),
-    title = await frame.locator('h1').boundingBox();
-  expect(title!.y).toBeGreaterThan(image!.y + image!.height);
-  await expect(frame.locator('.g-hero-text')).toHaveCSS('transition-duration', '0s');
+  const grid = await frame.getByTestId('photo-grid').boundingBox();
+  const title = await frame.locator('h1').boundingBox();
+  expect(grid!.y).toBeGreaterThan(title!.y);
 });

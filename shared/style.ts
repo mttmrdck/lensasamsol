@@ -4,10 +4,10 @@ import { z } from 'zod';
 
 const focal = z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1) });
 
-export const layoutModes = ['justified', 'masonry', 'editorial', 'uniform'] as const;
+export const layoutModes = ['folio', 'justified', 'masonry', 'editorial', 'uniform'] as const;
 export const coverStyles = ['featured-below', 'cinematic', 'split', 'typographic'] as const;
 export const themeIds = ['archival', 'exhibition', 'linen', 'stone', 'darkroom'] as const;
-export const pairingIds = ['archival', 'fine-art', 'literary', 'swiss', 'monograph', 'instrument'] as const;
+export const pairingIds = ['folio', 'archival', 'fine-art', 'literary', 'swiss', 'monograph', 'instrument'] as const;
 export const presetIds = [
   'minimal-archival',
   'editorial-warm',
@@ -93,10 +93,10 @@ export type PresetId = (typeof presetIds)[number];
 export const DEFAULT_STYLE: StyleConfig = {
   version: 1,
   presetId: 'minimal-archival',
-  composition: { template: 'editorial-signature', clusters: true, emphasizeFeatured: true },
-  layout: { mode: 'justified', rowHeight: 320, columns: 3, gap: 12, uniformAspect: '3:2', maxWidth: 1600 },
+  composition: { template: 'editorial-signature', useTemplate: false, clusters: true, emphasizeFeatured: true },
+  layout: { mode: 'folio', rowHeight: 320, columns: 3, gap: 8, uniformAspect: '3:2', maxWidth: 2400 },
   cover: {
-    style: 'featured-below',
+    style: 'typographic',
     focal: { x: 0.5, y: 0.5 },
     focalMobile: { x: 0.5, y: 0.5 },
     height: 82,
@@ -106,8 +106,8 @@ export const DEFAULT_STYLE: StyleConfig = {
     showDate: true,
     showCount: true,
   },
-  type: { pairing: 'instrument' },
-  color: { theme: 'archival', customBg: null, lightbox: 'darkroom' },
+  type: { pairing: 'folio' },
+  color: { theme: 'exhibition', customBg: null, lightbox: 'darkroom' },
   actions: {
     // Off by default: a folder link can expose files outside this client gallery.
     showFolderButton: false,
@@ -135,13 +135,13 @@ export interface PresetDef {
 export const PRESETS: PresetDef[] = [
   {
     id: 'minimal-archival',
-    name: 'Minimal Archival',
-    note: 'Warm paper, natural featured cover, balanced rows.',
+    name: 'Folio',
+    note: 'White contact sheet, tight columns, slim information column.',
     patch: {
-      layout: { mode: 'justified', gap: 12, rowHeight: 320 },
-      cover: { style: 'featured-below', titleAlign: 'left' },
-      type: { pairing: 'instrument' },
-      color: { theme: 'archival', lightbox: 'darkroom' },
+      layout: { mode: 'folio', gap: 8, rowHeight: 320 },
+      cover: { style: 'typographic', titleAlign: 'left' },
+      type: { pairing: 'folio' },
+      color: { theme: 'exhibition', lightbox: 'darkroom' },
     },
   },
   {
@@ -232,6 +232,33 @@ export function applyPreset(style: StyleConfig, preset: PresetDef): StyleConfig 
   };
 }
 
+/** Galleries saved with the untouched earlier default (justified rows, warm paper, serif) take the folio look. */
+function upgradeLegacyDefault(style: StyleConfig): StyleConfig {
+  const l = style.layout;
+  const untouched =
+    style.presetId === 'minimal-archival' &&
+    l.mode === 'justified' &&
+    l.rowHeight === 320 &&
+    l.gap === 12 &&
+    style.type.pairing === 'instrument' &&
+    style.color.theme === 'archival' &&
+    style.color.customBg === null &&
+    style.cover.style === 'featured-below';
+  if (!untouched) return style;
+  const c = style.composition;
+  return {
+    ...style,
+    composition:
+      c && c.template === 'editorial-signature' && c.useTemplate === undefined
+        ? { ...c, useTemplate: false }
+        : c,
+    layout: { ...l, mode: 'folio', gap: 8, maxWidth: 2400 },
+    cover: { ...style.cover, style: 'typographic' },
+    type: { pairing: 'folio' },
+    color: { ...style.color, theme: 'exhibition' },
+  };
+}
+
 /** Parses stored JSON defensively. Invalid/legacy data falls back to defaults merged field by field. */
 export function parseStyle(
   json: string | null | undefined,
@@ -241,7 +268,7 @@ export function parseStyle(
   try {
     const raw = JSON.parse(json);
     const ok = styleConfigSchema.safeParse(raw);
-    if (ok.success) return ok.data;
+    if (ok.success) return upgradeLegacyDefault(ok.data);
     const merged = {
       ...fallback,
       ...raw,
@@ -412,6 +439,15 @@ export interface PairingDef {
 }
 
 export const PAIRINGS: Record<PairingId, PairingDef> = {
+  folio: {
+    id: 'folio',
+    name: 'Folio',
+    display: "'Schibsted Grotesk', system-ui, sans-serif",
+    body: "'Schibsted Grotesk', system-ui, sans-serif",
+    displayWeight: 500,
+    displayTracking: '-0.01em',
+    families: ['Schibsted+Grotesk:ital,wght@0,400..700;1,400', 'Geist+Mono:wght@400;500'],
+  },
   instrument: {
     id: 'instrument',
     name: 'Editorial Monograph',

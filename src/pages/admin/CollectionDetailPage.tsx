@@ -228,7 +228,7 @@ export default function CollectionDetailPage() {
           to="/admin/collections"
           className="inline-flex w-fit items-center gap-1.5 text-[13px] text-slate hover:text-ink"
         >
-          <ArrowLeft size={14} aria-hidden="true" /> Client Galleries
+          <ArrowLeft size={14} aria-hidden="true" /> Collections
         </Link>
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div className="flex min-w-0 flex-col gap-1">
@@ -244,7 +244,7 @@ export default function CollectionDetailPage() {
                 label="Gallery title"
                 value={c.title}
                 onSave={(title) => title && update.mutate({ title })}
-                className="font-display text-[30px] leading-tight tracking-[-0.02em]"
+                className="text-[24px] font-semibold leading-8 tracking-[-0.02em]"
               />
               <StatusPill c={c} />
             </div>
@@ -358,6 +358,112 @@ export default function CollectionDetailPage() {
               Generate Client Link
             </Button>
           </div>
+        )}
+      </section>
+
+      {/* Assign Photos */}
+      <section id="assign" className="flex scroll-mt-6 flex-col gap-4" aria-labelledby="assign-h">
+        <div className="flex flex-col gap-1">
+          <h2 id="assign-h" className="text-[18px] font-semibold tracking-[-0.01em]">
+            Assign Photos
+          </h2>
+          <p className="tnum text-[13px] text-slate" data-testid="assign-summary">
+            <span className="font-medium text-ink">{assignedCount} assigned to this client</span>
+            {c.photos.length - assignedCount > 0 && `, ${c.photos.length - assignedCount} not assigned`},{' '}
+            {featuredCount} of 8 featured. Click a photo to add it to or remove it from this client’s gallery.
+            Files stay in Drive either way.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+          <div className="relative lg:w-[260px]">
+            <Search
+              size={15}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+              aria-hidden="true"
+            />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Filter by filename"
+              aria-label="Filter photos by filename"
+              className="pl-9"
+            />
+          </div>
+          <div className="w-full max-w-[400px]">
+            <Segmented<PhotoFilter>
+              label="Show"
+              value={filter}
+              onChange={setFilter}
+              options={[
+                { value: 'all', label: 'All' },
+                { value: 'assigned', label: 'Assigned' },
+                { value: 'unassigned', label: 'Not assigned' },
+                { value: 'featured', label: 'Featured' },
+              ]}
+            />
+          </div>
+          <div className="flex flex-wrap gap-2 lg:ml-auto">
+            <Button
+              size="sm"
+              disabled={!shownAssignable.length || bulk.isPending}
+              onClick={() => bulk.mutate({ ids: shownAssignable, assigned: true })}
+              icon={<Plus size={14} aria-hidden="true" />}
+            >
+              Assign shown ({shownAssignable.length})
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={!shownRemovable.length || bulk.isPending}
+              onClick={() => bulk.mutate({ ids: shownRemovable, assigned: false })}
+            >
+              Remove shown ({shownRemovable.length})
+            </Button>
+            <div className="hidden w-[170px] sm:block">
+              <Segmented
+                label="Density"
+                value={density}
+                onChange={setDensity}
+                options={[
+                  { value: 'compact', label: 'Compact' },
+                  { value: 'comfortable', label: 'Comfortable' },
+                ]}
+              />
+            </div>
+          </div>
+        </div>
+        <p className="text-[12px] leading-5 text-slate">
+          Featured flags remain available for your curation. The selected cover leads the client gallery. Only assigned
+          photos can be the cover or featured.
+        </p>
+
+        {c.photos.length === 0 ? (
+          <div className="rounded-ui border border-dashed border-line-strong px-6 py-12 text-center">
+            <p className="text-[15px] font-medium">No photos indexed yet</p>
+            <p className="mt-1 text-[13px] text-slate">
+              Add JPEG, PNG or WebP files to the folder, then re-sync.
+            </p>
+          </div>
+        ) : photos.length === 0 ? (
+          <p className="py-8 text-center text-[13px] text-slate">No photos match.</p>
+        ) : (
+          <ul className="flex flex-wrap gap-2" aria-label="Photos in the source folder">
+            {photos.map((p) => (
+              <PhotoTile
+                key={p.id}
+                p={p}
+                h={density === 'compact' ? 112 : 168}
+                isCover={p.id === c.cover?.id}
+                onToggle={() => photoPatch.mutate({ photoId: p.id, body: { assigned: !p.assigned } })}
+                onCover={() =>
+                  update.mutate({ coverPhotoId: p.id }, { onSuccess: () => toast.success('Cover updated') })
+                }
+                onFeature={() => photoPatch.mutate({ photoId: p.id, body: { featured: !p.featured } })}
+                canFeature={p.featured || featuredCount < 8}
+              />
+            ))}
+            <li className="flex-[10_1_0%]" aria-hidden="true" />
+          </ul>
         )}
       </section>
 
@@ -503,112 +609,6 @@ export default function CollectionDetailPage() {
             </p>
           </div>
         </div>
-      </section>
-
-      {/* Assign Photos */}
-      <section id="assign" className="flex scroll-mt-6 flex-col gap-4" aria-labelledby="assign-h">
-        <div className="flex flex-col gap-1">
-          <h2 id="assign-h" className="text-[18px] font-semibold tracking-[-0.01em]">
-            Assign Photos
-          </h2>
-          <p className="tnum text-[13px] text-slate" data-testid="assign-summary">
-            <span className="font-medium text-ink">{assignedCount} assigned to this client</span>
-            {c.photos.length - assignedCount > 0 && `, ${c.photos.length - assignedCount} not assigned`},{' '}
-            {featuredCount} of 8 featured. Click a photo to add it to or remove it from this client’s gallery.
-            Files stay in Drive either way.
-          </p>
-        </div>
-        <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
-          <div className="relative lg:w-[260px]">
-            <Search
-              size={15}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-              aria-hidden="true"
-            />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Filter by filename"
-              aria-label="Filter photos by filename"
-              className="pl-9"
-            />
-          </div>
-          <div className="w-full max-w-[400px]">
-            <Segmented<PhotoFilter>
-              label="Show"
-              value={filter}
-              onChange={setFilter}
-              options={[
-                { value: 'all', label: 'All' },
-                { value: 'assigned', label: 'Assigned' },
-                { value: 'unassigned', label: 'Not assigned' },
-                { value: 'featured', label: 'Featured' },
-              ]}
-            />
-          </div>
-          <div className="flex flex-wrap gap-2 lg:ml-auto">
-            <Button
-              size="sm"
-              disabled={!shownAssignable.length || bulk.isPending}
-              onClick={() => bulk.mutate({ ids: shownAssignable, assigned: true })}
-              icon={<Plus size={14} aria-hidden="true" />}
-            >
-              Assign shown ({shownAssignable.length})
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={!shownRemovable.length || bulk.isPending}
-              onClick={() => bulk.mutate({ ids: shownRemovable, assigned: false })}
-            >
-              Remove shown ({shownRemovable.length})
-            </Button>
-            <div className="hidden w-[170px] sm:block">
-              <Segmented
-                label="Density"
-                value={density}
-                onChange={setDensity}
-                options={[
-                  { value: 'compact', label: 'Compact' },
-                  { value: 'comfortable', label: 'Comfortable' },
-                ]}
-              />
-            </div>
-          </div>
-        </div>
-        <p className="text-[12px] leading-5 text-slate">
-          Featured flags remain available for your curation. The selected cover leads the client gallery. Only assigned
-          photos can be the cover or featured.
-        </p>
-
-        {c.photos.length === 0 ? (
-          <div className="rounded-ui border border-dashed border-line-strong px-6 py-12 text-center">
-            <p className="text-[15px] font-medium">No photos indexed yet</p>
-            <p className="mt-1 text-[13px] text-slate">
-              Add JPEG, PNG or WebP files to the folder, then re-sync.
-            </p>
-          </div>
-        ) : photos.length === 0 ? (
-          <p className="py-8 text-center text-[13px] text-slate">No photos match.</p>
-        ) : (
-          <ul className="flex flex-wrap gap-2" aria-label="Photos in the source folder">
-            {photos.map((p) => (
-              <PhotoTile
-                key={p.id}
-                p={p}
-                h={density === 'compact' ? 112 : 168}
-                isCover={p.id === c.cover?.id}
-                onToggle={() => photoPatch.mutate({ photoId: p.id, body: { assigned: !p.assigned } })}
-                onCover={() =>
-                  update.mutate({ coverPhotoId: p.id }, { onSuccess: () => toast.success('Cover updated') })
-                }
-                onFeature={() => photoPatch.mutate({ photoId: p.id, body: { featured: !p.featured } })}
-                canFeature={p.featured || featuredCount < 8}
-              />
-            ))}
-            <li className="flex-[10_1_0%]" aria-hidden="true" />
-          </ul>
-        )}
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">

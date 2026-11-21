@@ -189,6 +189,11 @@ export function arrangeStyle(
       coverId: selected?.id ?? null,
     },
     layout: { ...style.layout, mode: 'justified', rowHeight: t.rowHeight, gap: t.gap, maxWidth: t.maxWidth },
+    // Leaving the folio sheet for a template layout brings back a photographic opening.
+    cover:
+      style.layout.mode === 'folio' && style.cover.style === 'typographic'
+        ? { ...style.cover, style: 'featured-below' }
+        : style.cover,
   };
 }
 

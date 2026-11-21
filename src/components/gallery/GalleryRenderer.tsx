@@ -9,6 +9,7 @@ import { CoverHero } from './CoverHero';
 import { PhotoGrid } from './PhotoGrid';
 import { Lightbox } from './Lightbox';
 import { ExternalArrow, folderActionLabel } from './DriveLink';
+import { formatDate, plural } from '../../lib/format';
 
 export interface GalleryRendererProps {
   studio: PublicStudio;
@@ -48,9 +49,20 @@ export function GalleryRenderer(props: GalleryRendererProps) {
     scrollRoot,
     demoMode,
   } = props;
-  const photos = useMemo(
+  const folio = style.layout.mode === 'folio';
+  const ordered = useMemo(
     () => (mode === 'preview' ? orderPhotos(sourcePhotos, style.composition?.order) : sourcePhotos),
     [sourcePhotos, mode, style.composition?.order],
+  );
+  const cover: PublicPhoto | null = selectCover(
+    ordered,
+    style.composition?.coverId,
+    originalCollection.coverPhotoId,
+  );
+  // Folio: the photographer's chosen cover leads the sheet as its one larger frame (rendered once).
+  const photos = useMemo(
+    () => (folio && cover && ordered[0]?.id !== cover.id ? [cover, ...ordered.filter((p) => p.id !== cover.id)] : ordered),
+    [folio, cover, ordered],
   );
   const collection = {
     ...originalCollection,
@@ -78,7 +90,6 @@ export function GalleryRenderer(props: GalleryRendererProps) {
     [controlled, props.onActivePhotoChange],
   );
 
-  const cover: PublicPhoto | null = selectCover(photos, style.composition?.coverId, collection.coverPhotoId);
   const hrefFor = useCallback(
     (p: PublicPhoto) => (mode === 'public' ? `?photo=${encodeURIComponent(p.id)}` : '#'),
     [mode],
@@ -150,6 +161,36 @@ export function GalleryRenderer(props: GalleryRendererProps) {
   // A client gallery is standalone: no links to the studio site, a directory or any other gallery.
   const homeHref: string | null = null;
   const count = photos.length;
+  const facts = [
+    style.cover.showDate && collection.eventDate ? formatDate(collection.eventDate) : null,
+    collection.location,
+    style.cover.showCount && count ? plural(count, 'photograph') : null,
+  ].filter((f): f is string => !!f);
+  const subtitleText = style.composition?.subtitle?.trim() || null;
+  const descriptionText = style.cover.showDescription ? collection.description : null;
+  const gallery =
+    count === 0 ? (
+      <div className="mx-auto flex max-w-[460px] flex-col items-center gap-4 py-24 text-center">
+        <h2 className="g-display text-[24px]">Photographs are on their way</h2>
+        <p className="g-secondary text-[15px] leading-6">
+          This collection is still being prepared. Please check back shortly.
+        </p>
+        {homeHref && (
+          <a href={homeHref} className="g-btn g-btn-line mt-2">
+            Back to {studio.name}
+          </a>
+        )}
+      </div>
+    ) : (
+      <PhotoGrid
+        layoutRef={gridLayoutRef}
+        photos={photos}
+        style={style}
+        scrollRoot={scrollRoot}
+        hrefFor={hrefFor}
+        onOpen={open}
+      />
+    );
   const folderLink = !style.composition && style.actions.showFolderButton && collection.folderUrl;
 
   return (
@@ -164,75 +205,99 @@ export function GalleryRenderer(props: GalleryRendererProps) {
       >
         {/* Everything behind the viewer is inert while it is open (focus + screen readers stay in the dialog). */}
         <div inert={activeIndex >= 0 || undefined}>
-          <CoverHero collection={collection} cover={cover} studio={studio} style={style} count={count} />
-
-          <section ref={gridRef} className="g-wrap g-exhibition-gallery pb-16" aria-label="All photographs">
-            {count === 0 ? (
-              <div className="mx-auto flex max-w-[460px] flex-col items-center gap-4 py-24 text-center">
-                <h2 className="g-display text-[34px]">Photographs are on their way</h2>
-                <p className="g-secondary text-[15px] leading-6">
-                  This collection is still being prepared. Please check back shortly.
-                </p>
-                {homeHref && (
-                  <a href={homeHref} className="g-btn g-btn-line mt-2">
-                    Back to {studio.name}
-                  </a>
-                )}
-              </div>
-            ) : (
-              <>
-                <PhotoGrid
-                  layoutRef={gridLayoutRef}
-                  photos={photos}
-                  style={style}
-                  scrollRoot={scrollRoot}
-                  hrefFor={hrefFor}
-                  onOpen={open}
-                />
-              </>
-            )}
-          </section>
-
-          <footer className="g-edition-footer border-t border-[var(--g-line)]">
-            <div className="g-wrap flex flex-col gap-6 py-12 text-[13px] sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[14px] font-medium">Photographed by {studio.name}</span>
-                <span className="g-muted max-w-[56ch] leading-5">
-                  Prepared privately for you. Anyone who has this link can view the gallery, so please share
-                  it only with people you trust.
-                </span>
-                {collection.source === 'demo' && demoMode && (
-                  <span className="g-muted max-w-[52ch] leading-5">
-                    Demo collection. Sample images by Unsplash photographers, served via Lorem Picsum; each
-                    photo’s source link credits its author.
+          {folio ? (
+            <div className="g-folio">
+              <aside className="g-folio-info" aria-label="About this gallery">
+                <span className="g-folio-mark">{studio.name}</span>
+                <div className="g-folio-about">
+                  <h1 className="g-folio-title">{collection.title}</h1>
+                  {facts.length > 0 && (
+                    <p className="g-folio-facts tnum">
+                      {facts.map((f) => (
+                        <span key={f}>{f}</span>
+                      ))}
+                    </p>
+                  )}
+                  {subtitleText && <p className="g-folio-desc">{subtitleText}</p>}
+                  {descriptionText && descriptionText !== subtitleText && (
+                    <p className="g-folio-desc">{descriptionText}</p>
+                  )}
+                </div>
+                <div className="g-folio-links">
+                  {folderLink && (
+                    <a href={collection.folderUrl!} target="_blank" rel="noopener noreferrer">
+                      {folderActionLabel(style)}
+                      <ExternalArrow size={12} />
+                      <span className="sr-only">(opens in a new tab)</span>
+                    </a>
+                  )}
+                  {studio.contactUrl && (
+                    <a href={studio.contactUrl} rel="noopener noreferrer">
+                      {studio.contactLabel || 'Contact'}
+                    </a>
+                  )}
+                  <span className="g-folio-note">
+                    Private link. Anyone who has it can view this gallery.
                   </span>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-x-6 gap-y-3">
-                {folderLink && (
-                  <a
-                    className="inline-flex min-h-11 items-center gap-1.5 hover:opacity-70"
-                    href={collection.folderUrl!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {folderActionLabel(style)}
-                    <ExternalArrow size={14} />
-                    <span className="sr-only">(opens in a new tab)</span>
-                  </a>
-                )}
-                {studio.contactUrl && (
-                  <a
-                    className="inline-flex min-h-11 items-center hover:opacity-70"
-                    href={studio.contactUrl}
-                    rel="noopener noreferrer"
-                  >
-                    {studio.contactLabel || 'Contact'}
-                  </a>
-                )}
-              </div>
+                  {collection.source === 'demo' && demoMode && (
+                    <span className="g-folio-note">
+                      Demo collection. Sample images by Unsplash photographers, served via Lorem Picsum.
+                    </span>
+                  )}
+                </div>
+              </aside>
+              <section ref={gridRef} className="g-folio-sheet" aria-label="All photographs">
+                {gallery}
+              </section>
             </div>
-          </footer>
+          ) : (
+            <>
+              <CoverHero collection={collection} cover={cover} studio={studio} style={style} count={count} />
+              <section ref={gridRef} className="g-wrap g-exhibition-gallery pb-16" aria-label="All photographs">
+                {gallery}
+              </section>
+              <footer className="g-edition-footer border-t border-[var(--g-line)]">
+                <div className="g-wrap flex flex-col gap-6 py-12 text-[13px] sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[14px] font-medium">Photographed by {studio.name}</span>
+                    <span className="g-muted max-w-[56ch] leading-5">
+                      Prepared privately for you. Anyone who has this link can view the gallery, so please
+                      share it only with people you trust.
+                    </span>
+                    {collection.source === 'demo' && demoMode && (
+                      <span className="g-muted max-w-[52ch] leading-5">
+                        Demo collection. Sample images by Unsplash photographers, served via Lorem Picsum;
+                        each photo’s source link credits its author.
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-x-6 gap-y-3">
+                    {folderLink && (
+                      <a
+                        className="inline-flex min-h-11 items-center gap-1.5 hover:opacity-70"
+                        href={collection.folderUrl!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {folderActionLabel(style)}
+                        <ExternalArrow size={14} />
+                        <span className="sr-only">(opens in a new tab)</span>
+                      </a>
+                    )}
+                    {studio.contactUrl && (
+                      <a
+                        className="inline-flex min-h-11 items-center hover:opacity-70"
+                        href={studio.contactUrl}
+                        rel="noopener noreferrer"
+                      >
+                        {studio.contactLabel || 'Contact'}
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </footer>
+            </>
+          )}
         </div>
 
         {activeIndex >= 0 && (

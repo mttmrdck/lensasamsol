@@ -28,7 +28,7 @@ test.describe('client gallery experience', () => {
     await expect(page.getByRole('heading', { name: 'Selected moments' })).toHaveCount(0);
     // Standalone: no links to a directory, the studio homepage or other galleries.
     expect(await page.locator('a[href="/"], a[href*="/g/"]').count()).toBe(0);
-    await expect(page.getByText(/Anyone who has this link can view the gallery/)).toBeVisible();
+    await expect(page.getByText(/Anyone who has it can view this gallery/)).toBeVisible();
 
     await page
       .getByTestId('photo-grid')

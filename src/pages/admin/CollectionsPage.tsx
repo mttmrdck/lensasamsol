@@ -87,91 +87,103 @@ export default function CollectionsPage() {
     all.filter((c) => (f === 'all' ? true : f === 'issue' ? c.syncStatus === 'error' : c.status === f))
       .length;
 
+  const search = (
+    <div className="relative">
+      <Search
+        size={15}
+        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+        aria-hidden="true"
+      />
+      <Input
+        ref={searchRef}
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search"
+        className="border-transparent bg-transparent pl-9 shadow-none hover:bg-subtle focus:bg-surface"
+        aria-label="Search client galleries"
+      />
+    </div>
+  );
+
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader
-        title="Client Galleries"
-        sub={q.data ? `${all.length} client galleries, each with its own private link` : undefined}
-      >
+      <PageHeader title="Collections" middle={search}>
         <Link
           to="/admin/collections/new"
-          className="inline-flex h-9 items-center gap-2 rounded-ui bg-ink px-3.5 text-[14px] font-medium text-white hover:bg-ink-2"
+          className="inline-flex h-10 items-center gap-2 rounded-ui bg-ink px-4 text-[14px] font-medium text-white hover:bg-ink-2"
         >
           <Plus size={16} aria-hidden="true" /> Create Client Gallery
         </Link>
       </PageHeader>
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-        <div className="relative lg:w-[300px]">
-          <Search
-            size={15}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-            aria-hidden="true"
-          />
-          <Input
-            ref={searchRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search client, title or date"
-            className="pl-9"
-            aria-label="Search client galleries"
+      <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        <div className="min-w-[380px] sm:w-[400px] [&_button]:whitespace-nowrap">
+          <Segmented<Filter>
+            label="Status"
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { value: 'all', label: `All ${count('all')}` },
+              { value: 'published', label: `Published ${count('published')}` },
+              { value: 'draft', label: `Draft ${count('draft')}` },
+              { value: 'issue', label: `Sync issue ${count('issue')}` },
+            ]}
           />
         </div>
-        <div className="-mx-4 flex items-center gap-3 overflow-x-auto px-4 lg:mx-0 lg:flex-1 lg:px-0">
-          <div className="min-w-[340px] flex-1 lg:max-w-[420px]">
-            <Segmented<Filter>
-              label="Status"
-              value={filter}
-              onChange={setFilter}
-              options={[
-                { value: 'all', label: `All ${count('all')}` },
-                { value: 'published', label: `Shared ${count('published')}` },
-                { value: 'draft', label: `Draft ${count('draft')}` },
-                { value: 'issue', label: `Sync issue ${count('issue')}` },
-              ]}
-            />
-          </div>
-          <label className="sr-only" htmlFor="sort">
-            Sort
-          </label>
-          <select
-            id="sort"
-            value={sort}
-            onChange={(e) => setSort(e.target.value as Sort)}
-            className="h-9 shrink-0 rounded-ui border border-line bg-surface px-2.5 text-[13px]"
-          >
-            <option value="event">Newest event date</option>
-            <option value="updated">Recently updated</option>
-            <option value="title">Alphabetical</option>
-          </select>
-          <div className="ml-auto w-[88px] shrink-0">
-            <Segmented
-              label="View"
-              value={view}
-              onChange={setView}
-              options={[
-                { value: 'grid', label: <LayoutGrid size={15} aria-label="Grid view" /> },
-                { value: 'list', label: <List size={15} aria-label="List view" /> },
-              ]}
-            />
-          </div>
+        <label className="sr-only" htmlFor="sort">
+          Sort
+        </label>
+        <select
+          id="sort"
+          value={sort}
+          onChange={(e) => setSort(e.target.value as Sort)}
+          className="h-9 shrink-0 rounded-ui border border-line bg-surface px-2.5 text-[13px]"
+        >
+          <option value="event">Newest event date</option>
+          <option value="updated">Recently updated</option>
+          <option value="title">Alphabetical</option>
+        </select>
+        <div className="ml-auto w-[88px] shrink-0">
+          <Segmented
+            label="View"
+            value={view}
+            onChange={setView}
+            options={[
+              { value: 'grid', label: <LayoutGrid size={15} aria-label="Grid view" /> },
+              { value: 'list', label: <List size={15} aria-label="List view" /> },
+            ]}
+          />
         </div>
       </div>
 
       {q.isPending ? (
-        <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-7 md:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: 8 }, (_, i) => (
-            <div key={i} className="aspect-[3/2.6] animate-pulse rounded-ui bg-placeholder" />
+            <div key={i} className="aspect-[4/3] animate-pulse bg-placeholder" />
           ))}
         </div>
       ) : list.length === 0 ? (
-        <p className="rounded-ui border border-dashed border-line-strong px-6 py-12 text-center text-[14px] text-slate">
-          {all.length === 0
-            ? 'No client galleries yet. Create one from a Google Drive folder.'
-            : 'No client galleries match these filters.'}
-        </p>
+        all.length === 0 ? (
+          <div className="flex flex-col items-start gap-3 border-t border-line py-14">
+            <h2 className="text-[18px] font-medium">No client galleries yet</h2>
+            <p className="max-w-[48ch] text-[14px] leading-6 text-slate">
+              Create a gallery from a Google Drive folder, choose the photographs for one client, then send
+              them a private link.
+            </p>
+            <Link
+              to="/admin/collections/new"
+              className="inline-flex h-10 items-center gap-2 rounded-ui bg-ink px-4 text-[14px] font-medium text-white hover:bg-ink-2"
+            >
+              <Plus size={16} aria-hidden="true" /> Create Client Gallery
+            </Link>
+          </div>
+        ) : (
+          <p className="border-t border-line py-12 text-[14px] text-slate">
+            No client galleries match these filters.
+          </p>
+        )
       ) : view === 'grid' ? (
-        <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-7 md:grid-cols-3 xl:grid-cols-4">
           {list.map((c) => (
             <CollectionCard key={c.id} c={c} />
           ))}

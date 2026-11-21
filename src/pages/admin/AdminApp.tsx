@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { FolderSync, Images, LayoutGrid, LogOut, Menu, Paintbrush, Settings, X } from 'lucide-react';
+import { FolderSync, Images, LogOut, Menu, Paintbrush, Settings, X } from 'lucide-react';
 import { api, post } from '../../lib/api';
 import type { DriveStatus } from '../../../shared/api';
 import { cx } from '../../components/ui';
 import LoginPage from './LoginPage';
-import DashboardPage from './DashboardPage';
 import CollectionsPage from './CollectionsPage';
 import NewCollectionPage from './NewCollectionPage';
 import CollectionDetailPage from './CollectionDetailPage';
@@ -45,7 +44,7 @@ export default function AdminApp() {
         element={
           <Shell demo={!!me.data.demoMode}>
             <Routes>
-              <Route index element={<DashboardPage />} />
+              <Route index element={<Navigate to="/admin/collections" replace />} />
               <Route path="collections" element={<CollectionsPage />} />
               <Route path="collections/new" element={<NewCollectionPage />} />
               <Route path="collections/:id" element={<CollectionDetailPage />} />
@@ -61,8 +60,7 @@ export default function AdminApp() {
 }
 
 const NAV = [
-  { to: '/admin', label: 'Dashboard', icon: LayoutGrid, end: true },
-  { to: '/admin/collections', label: 'Client Galleries', icon: Images },
+  { to: '/admin/collections', label: 'Collections', icon: Images },
   { to: '/admin/drive', label: 'Drive Sync', icon: FolderSync },
   { to: '/admin/appearance', label: 'Appearance Defaults', icon: Paintbrush },
   { to: '/admin/settings', label: 'Settings', icon: Settings },
@@ -121,7 +119,7 @@ function Shell({ children, demo }: { children: ReactNode; demo: boolean }) {
       <div className="flex h-[60px] items-center justify-between px-5">
         <span className="flex min-w-0 items-center gap-2">
           <img src="/brand/icon-48.png" alt="" width={24} height={24} className="h-6 w-6 shrink-0" />
-          <span className="truncate font-display text-[20px] leading-none tracking-[-0.02em]">
+          <span className="truncate font-mono text-[13px] font-medium leading-none">
             {settings.data?.studioName ?? 'lensasamsol'}
           </span>
         </span>
@@ -135,16 +133,15 @@ function Shell({ children, demo }: { children: ReactNode; demo: boolean }) {
         </button>
       </div>
       <ul className="flex flex-col gap-0.5 px-3 pt-2">
-        {NAV.map(({ to, label, icon: Icon, end }) => (
+        {NAV.map(({ to, label, icon: Icon }) => (
           <li key={to}>
             <NavLink
               to={to}
-              end={end}
               className={({ isActive }) =>
                 cx(
-                  'flex h-9 items-center gap-2.5 rounded-ui px-2.5 text-[14px] transition-colors',
+                  'flex h-10 items-center gap-3 rounded-ui px-2.5 text-[14px] transition-colors',
                   isActive
-                    ? 'bg-surface font-medium text-ink shadow-[0_0_0_1px_var(--color-line)]'
+                    ? 'bg-subtle font-medium text-ink'
                     : 'text-slate hover:bg-subtle hover:text-ink',
                 )
               }
@@ -193,7 +190,7 @@ function Shell({ children, demo }: { children: ReactNode; demo: boolean }) {
 
   return (
     <div className="studio-shell min-h-svh bg-canvas text-ink">
-      <aside className="studio-rail fixed inset-y-0 left-0 z-30 hidden w-[240px] border-r border-line bg-canvas lg:block">
+      <aside className="studio-rail fixed inset-y-0 left-0 z-30 hidden w-[224px] border-r border-line bg-canvas lg:block">
         {rail}
       </aside>
       {open && (
@@ -209,7 +206,7 @@ function Shell({ children, demo }: { children: ReactNode; demo: boolean }) {
           </aside>
         </div>
       )}
-      <div className="lg:pl-[240px]" inert={open || undefined}>
+      <div className="lg:pl-[224px]" inert={open || undefined}>
         <div className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-line bg-canvas/95 px-4 backdrop-blur lg:hidden">
           <button
             type="button"
@@ -221,9 +218,9 @@ function Shell({ children, demo }: { children: ReactNode; demo: boolean }) {
             <Menu size={18} />
           </button>
           <img src="/brand/icon-48.png" alt="" width={22} height={22} className="h-[22px] w-[22px]" />
-          <span className="font-display text-[19px]">{settings.data?.studioName ?? 'lensasamsol'}</span>
+          <span className="font-mono text-[13px] font-medium">{settings.data?.studioName ?? 'lensasamsol'}</span>
         </div>
-        <main className="studio-main mx-auto max-w-[1360px] px-4 py-6 sm:px-8 sm:py-10">{children}</main>
+        <main className="studio-main mx-auto max-w-[1680px] px-4 py-5 sm:px-8 sm:py-7">{children}</main>
       </div>
     </div>
   );

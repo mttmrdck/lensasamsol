@@ -62,7 +62,6 @@ export function CoverHero({ collection, cover, studio, style, count }: Props) {
     >
       <div className="g-exhibition-masthead">
         <span className="g-exhibition-wordmark">{studio.name}</span>
-        <span className="g-edition-label">A private photographic edition</span>
       </div>
       {showImage ? (
         <figure

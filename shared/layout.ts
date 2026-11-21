@@ -179,6 +179,45 @@ export function masonryLayout(aspects: number[], width: number, columns: number,
   return { boxes, height: Math.max(0, Math.max(...heights) - gap) };
 }
 
+/** Columns for the folio contact sheet: photographs stay near 300px wide whatever the viewport. */
+export function folioColumns(width: number): number {
+  if (width < 520) return 2;
+  if (width < 880) return 3;
+  if (width < 1280) return 4;
+  return 5;
+}
+
+/**
+ * Folio contact sheet: tight, aspect-true columns. Photos keep their source order (each goes to the
+ * shortest column, so the DOM and reading order stay the photographer's). A landscape opening frame spans
+ * two columns so the sheet starts with one intentional, larger photograph instead of a banner.
+ */
+export function folioLayout(aspects: number[], width: number, gap: number): LayoutResult {
+  if (aspects.length === 0 || width <= 0) return { boxes: [], height: 0 };
+  const cols = folioColumns(width);
+  const colWidths = distribute(width - gap * (cols - 1), new Array(cols).fill(1));
+  const colX: number[] = [];
+  colWidths.reduce((x, w, k) => ((colX[k] = x), x + w + gap), 0);
+  const heights = new Array(cols).fill(0);
+  const boxes: Box[] = [];
+  let start = 0;
+  if (cols >= 3 && aspects[0] >= 1.2) {
+    const w = colWidths[0] + gap + colWidths[1];
+    const h = Math.max(1, Math.round(w / aspects[0]));
+    boxes.push({ i: 0, x: colX[0], y: 0, w, h });
+    heights[0] = heights[1] = h + gap;
+    start = 1;
+  }
+  for (let i = start; i < aspects.length; i++) {
+    let c = 0;
+    for (let k = 1; k < cols; k++) if (heights[k] < heights[c] - 1) c = k;
+    const h = Math.max(1, Math.round(colWidths[c] / aspects[i]));
+    boxes.push({ i, x: colX[c], y: heights[c], w: colWidths[c], h });
+    heights[c] += h + gap;
+  }
+  return { boxes, height: Math.max(0, Math.max(...heights) - gap) };
+}
+
 export function uniformLayout(
   count: number,
   width: number,
@@ -275,7 +314,7 @@ export function editorialLayout(aspects: number[], width: number, target: number
 }
 
 export interface GalleryLayoutInput {
-  mode: 'justified' | 'masonry' | 'editorial' | 'uniform';
+  mode: 'justified' | 'masonry' | 'editorial' | 'uniform' | 'folio';
   width: number;
   rowHeight: number;
   columns: number;
@@ -292,6 +331,8 @@ export function computeGalleryLayout(
   const gap = responsiveGap(width, input.gap);
   const target = responsiveRowHeight(width, input.rowHeight);
   switch (input.mode) {
+    case 'folio':
+      return folioLayout(aspects, width, Math.min(input.gap, 10));
     case 'masonry':
       return masonryLayout(aspects, width, responsiveColumns(width, input.columns), gap);
     case 'uniform': {

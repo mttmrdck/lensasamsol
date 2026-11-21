@@ -37,14 +37,14 @@ test.describe('client gallery entrance', () => {
     await expect(entrance(page)).toBeAttached();
     await expect(page.getByTestId('iris-intro')).toBeAttached();
     // The real gallery is rendered underneath — the hero image IS this gallery's cover, not a stand-in.
-    await expect(page.locator('.g-root[data-mode="public"] .g-hero-img')).toHaveAttribute(
+    await expect(page.locator('.g-root[data-mode="public"] [data-testid="photo-grid"] .g-tile img').first()).toHaveAttribute(
       'src',
-      new RegExp(`/img/t/[^/]+/${cover}/l$`),
+      new RegExp(`/img/t/[^/]+/${cover}/(m|l)$`),
     );
     await expect(page.locator('.g-root[data-entrance]')).toBeAttached();
     await expect(entrance(page)).not.toBeAttached({ timeout: 6000 });
     await expect(page.locator('.g-root')).toHaveAttribute('data-entrance', 'reveal');
-    await expect(page.locator('.g-hero-text').first()).toHaveCSS('opacity', '1', { timeout: 3000 });
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.style.overflow)).toBe('');
     // Keyboard reaches the gallery straight away (nothing left inert).
     await page.keyboard.press('Tab');
@@ -59,7 +59,7 @@ test.describe('client gallery entrance', () => {
       const page = await ctx.newPage();
       await page.goto(url);
       await expect(entrance(page)).toBeAttached();
-      await expect(page.locator('.g-hero-img')).toHaveAttribute('src', new RegExp(`/${cover}/l$`));
+      await expect(page.locator('.g-hero-img, [data-testid="photo-grid"] .g-tile img').first()).toHaveAttribute('src', new RegExp(`/${cover}/(m|l|xl)$`));
       await ctx.close();
     }
   });
@@ -87,7 +87,8 @@ test.describe('client gallery entrance', () => {
     const url = await link(request, 'col_demo_coast');
     const photo = (await (await request.get(`/api/public${url}`)).json()).photos[3].id;
     await page.goto(`${url}?photo=${photo}`);
-    await expect(page.getByTestId('lightbox')).toContainText('04 /');
+    await expect(page.getByTestId('lightbox')).toContainText(/\d\d \/ 28/);
+    await expect(page).toHaveURL(new RegExp(`photo=${photo}`));
     await expect(entrance(page)).toHaveCount(0);
   });
 

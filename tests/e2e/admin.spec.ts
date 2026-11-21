@@ -10,41 +10,19 @@ test.beforeEach(async ({ context }) => {
 });
 
 test.describe('admin', () => {
-  test('editor hero appears when an initially typographic cover becomes photographic', async ({
-    page,
-    request,
-  }) => {
+  test('editor preview renders the folio sheet with the selected cover leading', async ({ page }) => {
     await page.route('https://fonts.googleapis.com/**', (route) =>
       route.fulfill({ contentType: 'text/css', body: '' }),
     );
-    await apiLogin(request);
-    const original = await adminJson<AdminCollectionDetail>(
-      request,
-      'GET',
-      '/api/admin/collections/col_demo_coast',
-    );
-    await adminJson(request, 'PUT', '/api/admin/collections/col_demo_coast/style', {
-      style: { ...original.styleDraft, cover: { ...original.styleDraft.cover, style: 'typographic' } },
-    });
-    try {
-      await login(page);
-      await page.goto('/admin/collections/col_demo_coast/design');
-      await expect(page.getByTestId('typographic-hero')).toBeVisible();
-      await page.getByRole('tab', { name: 'Cover', exact: true }).click();
-      await page
-        .getByRole('radiogroup', { name: 'Cover style' })
-        .getByRole('radio', { name: 'Featured', exact: true })
-        .click();
-      const image = page.getByTestId('featured-hero').locator('.g-hero-img');
-      await expect(image).toHaveAttribute('src', /\/img\//);
-      await expect
-        .poll(() => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0))
-        .toBe(true);
-    } finally {
-      await adminJson(request, 'PUT', '/api/admin/collections/col_demo_coast/style', {
-        style: original.styleDraft,
-      });
-    }
+    await login(page);
+    await page.goto('/admin/collections/col_demo_coast/design');
+    await expect(page.locator('.g-folio')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    const first = page.locator('[data-testid="photo-grid"] .g-tile img').first();
+    await expect(first).toHaveAttribute('src', /\/img\//);
+    await expect
+      .poll(() => first.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0))
+      .toBe(true);
   });
 
   test('editor lightbox remains inside its smaller mobile preview frame', async ({ page }) => {
@@ -94,21 +72,27 @@ test.describe('admin', () => {
     expect(status).toBe(403);
   });
 
-  test('cards offer Manage Photos, Customize Design and Copy Client Link', async ({ page }) => {
+  test('cards open a menu with Manage photos, Customize design and Copy client link', async ({ page }) => {
     await login(page);
     await page.goto('/admin/collections');
-    await expect(page.getByRole('heading', { name: 'Client Galleries' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Collections', level: 1 })).toBeVisible();
     const card = page.locator('article').filter({ hasText: 'Hana Rahman' });
-    await expect(card.getByRole('link', { name: 'Manage Photos' })).toBeVisible();
-    await expect(card.getByRole('link', { name: 'Customize Design' })).toBeVisible();
-    await expect(card.getByRole('button', { name: 'Copy Client Link' })).toBeEnabled();
+    await card.getByRole('button', { name: /Actions for/ }).focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('menuitem', { name: 'Manage photos' })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'Customize design' })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'Copy client link' })).toBeEnabled();
+    await page.keyboard.press('Escape');
     // Drafts can't hand out a link that doesn't open.
-    await expect(
-      page
-        .locator('article')
-        .filter({ hasText: 'Mei Chen' })
-        .getByRole('button', { name: 'Copy Client Link' }),
-    ).toBeDisabled();
+    await page
+      .locator('article')
+      .filter({ hasText: 'Mei Chen' })
+      .getByRole('button', { name: /Actions for/ })
+      .click();
+    await expect(page.getByRole('menuitem', { name: 'Copy client link' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
   });
 
   test('removing a photo from a client gallery removes it for that client', async ({ page, request }) => {
