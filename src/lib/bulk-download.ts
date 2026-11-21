@@ -186,12 +186,23 @@ export async function downloadAll(o: Options): Promise<BulkResult> {
   };
   for (let i = 0; i < total; i++) {
     o.onProgress({ done: i, total });
-    const res = await fetchOne(i);
-    if (res) {
-      const blob = await res.blob();
-      batch.push({ name: nameOf(i, res), lastModified: new Date(), input: blob });
-      bytes += blob.size;
-      saved++;
+    // Read the whole body before accepting the file: a truncated or interrupted body must never be added as if it
+    // were complete. One retry, then it is reported as failed.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const res = await fetchOne(i);
+      if (!res) break; // already recorded as failed
+      try {
+        const blob = await res.blob();
+        const declared = Number(res.headers.get('content-length'));
+        if (Number.isFinite(declared) && declared > 0 && blob.size !== declared) throw new Error('short read');
+        batch.push({ name: nameOf(i, res), lastModified: new Date(), input: blob });
+        bytes += blob.size;
+        saved++;
+        break;
+      } catch {
+        o.signal.throwIfAborted();
+        if (attempt === 1) failed.push({ name: label(i), reason: 'The download was interrupted.' });
+      }
     }
     if (bytes >= (o.partBytes ?? PART_BYTES) && i < total - 1) await flush(false);
   }

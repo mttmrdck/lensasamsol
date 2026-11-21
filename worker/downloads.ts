@@ -18,6 +18,25 @@ import { MAX_ORIGINAL_BYTES, attachmentHeader, downloadContentType } from '../sh
  * per-photo requests, so the Worker never builds a ZIP (a ZIP needs a CRC-32 over every byte, which is CPU work that
  * grows with gallery size).
  */
+/**
+ * Enforces the size cap on the bytes that actually flow, not on the Content-Length header (which Drive may omit,
+ * and which cannot be trusted). Chunks pass straight through; only a running total is kept, so there is no per-byte
+ * work and nothing is buffered. Exceeding the cap errors the stream, which also cancels the Drive transfer, so the
+ * visitor gets an interrupted download rather than a silently truncated file that looks complete.
+ */
+export function capBytes(body: ReadableStream<Uint8Array>, max: number): ReadableStream<Uint8Array> {
+  let seen = 0;
+  return body.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        seen += chunk.byteLength;
+        if (seen > max) controller.error(new Error('download_too_large'));
+        else controller.enqueue(chunk);
+      },
+    }),
+  );
+}
+
 export const downloadRoutes = new Hono<AppEnv>();
 downloadRoutes.use('*', async (c, next) => {
   await next();
@@ -82,5 +101,5 @@ downloadRoutes.get('/t/:token/:photoId', async (c) => {
     'content-disposition': attachmentHeader(row.filename),
   });
   if (Number.isFinite(length) && length > 0) headers.set('content-length', String(length));
-  return new Response(upstream.body, { status: 200, headers });
+  return new Response(upstream.body ? capBytes(upstream.body, MAX_ORIGINAL_BYTES) : null, { status: 200, headers });
 });

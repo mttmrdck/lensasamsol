@@ -173,6 +173,69 @@ describe('ZIP integrity (verified with an independent reader)', () => {
   });
 });
 
+describe('interrupted and truncated bodies', () => {
+  const broken = () =>
+    new Response(
+      new ReadableStream<Uint8Array>({
+        start(c) {
+          c.enqueue(new Uint8Array(100));
+          c.error(new Error('reset'));
+        },
+      }),
+    );
+
+  it('in-memory path: a body that dies mid-transfer is reported, never added, and the rest is intact', async () => {
+    const files = makeFiles(8);
+    const { promise, parts } = run(files, { hook: (id: string) => (id === files[2].id ? broken() : undefined) } as never);
+    const result = await promise;
+    expect(result.saved).toBe(7);
+    expect(result.failed).toHaveLength(1);
+    const z = inspect(await bytesOf(parts[0].blob));
+    expect(z.bad).toBeNull();
+    expect(z.entries.at(-1)!.name).toBe('DOWNLOAD-ERRORS.txt');
+    expect(z.entries).toHaveLength(8); // 7 photos + the report
+    expect(z.entries.slice(0, 7).every((e) => files.some((f) => sha(f.bytes) === e.sha256))).toBe(true);
+  });
+
+  it('in-memory path: a body shorter than its declared length is not accepted as complete', async () => {
+    const files = makeFiles(4);
+    const short = (id: string) =>
+      id === files[1].id ? new Response(new Uint8Array(50), { headers: { 'content-length': '5000' } }) : undefined;
+    const { promise, parts } = run(files, { hook: short } as never);
+    const result = await promise;
+    expect(result.saved).toBe(3);
+    expect(result.failed).toHaveLength(1);
+    expect(inspect(await bytesOf(parts[0].blob)).bad).toBeNull();
+  });
+
+  it('streaming path: a body that dies mid-file fails the whole download and aborts the file', async () => {
+    const files = makeFiles(6, () => 5000);
+    const f = stubFetch(files, (id) => (id === files[3].id ? broken() : undefined));
+    let aborted = false;
+    const handle = {
+      createWritable: async () =>
+        new WritableStream<Uint8Array>({
+          write() {},
+          abort() {
+            aborted = true;
+          },
+        }),
+    } as unknown as FileSystemFileHandle;
+    await expect(
+      downloadAll({
+        photos: files.map((x) => ({ id: x.id, filename: null })),
+        zipName: 'x',
+        urlFor: (id) => `/dl/t/T/${id}`,
+        signal: new AbortController().signal,
+        onProgress: () => undefined,
+        fetchImpl: f.impl,
+        target: handle,
+      }),
+    ).rejects.toBeTruthy(); // surfaced as an error, so the UI cannot report success
+    expect(aborted).toBe(true);
+  });
+});
+
 describe('failures, retries and cancellation', () => {
   it('records unavailable photos instead of dropping them silently', async () => {
     const files = makeFiles(20);

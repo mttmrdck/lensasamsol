@@ -42,6 +42,94 @@ beforeEach(() => {
   );
 });
 
+const MB = 1024 * 1024;
+/** A source of `count` chunks of 1 MB that only produces when asked (pull), and records how far ahead it ran. */
+function source(count: number, stats = { produced: 0, consumed: 0, maxAhead: 0, cancelled: false }) {
+  let i = 0;
+  const body = new ReadableStream<Uint8Array>(
+    {
+      pull(controller) {
+        if (i++ >= count) return controller.close();
+        stats.produced++;
+        stats.maxAhead = Math.max(stats.maxAhead, stats.produced - stats.consumed);
+        controller.enqueue(new Uint8Array(MB));
+      },
+      cancel() {
+        stats.cancelled = true;
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  return { body, stats };
+}
+async function drain(res: Response, stats?: { consumed: number }) {
+  const reader = res.body!.getReader();
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return total;
+    total += value.byteLength;
+    if (stats) stats.consumed++;
+  }
+}
+
+describe('size cap and streaming guarantees', () => {
+  it('stops at the cap when Content-Length is missing, and cancels the upstream', async () => {
+    const { body, stats } = source(260);
+    vi.mocked(fetchDriveOriginal).mockResolvedValueOnce(new Response(body)); // no content-length at all
+    const res = await get(TOKEN_A, 'ph_AAAAAAAAAAAA');
+    expect(res.status).toBe(200);
+    let delivered = 0;
+    await expect(
+      (async () => {
+        const reader = res.body!.getReader();
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) return;
+          delivered += value.byteLength;
+        }
+      })(),
+    ).rejects.toThrow(); // an interrupted download, never a silently truncated "complete" file
+    expect(delivered).toBeLessThanOrEqual(200 * MB);
+    expect(stats.cancelled).toBe(true);
+    expect(stats.produced).toBeLessThan(260); // the transfer was cut, not read to the end
+  });
+
+  it('a Content-Length that understates the body does not bypass the cap', async () => {
+    const { body, stats } = source(260);
+    vi.mocked(fetchDriveOriginal).mockResolvedValueOnce(new Response(body, { headers: { 'content-length': '10' } }));
+    const res = await get(TOKEN_A, 'ph_AAAAAAAAAAAA');
+    await expect(drain(res)).rejects.toThrow();
+    expect(stats.cancelled).toBe(true);
+  });
+
+  it('a file under the cap is delivered completely', async () => {
+    const { body } = source(25);
+    vi.mocked(fetchDriveOriginal).mockResolvedValueOnce(new Response(body));
+    expect(await drain(await get(TOKEN_A, 'ph_AAAAAAAAAAAA'))).toBe(25 * MB);
+  });
+
+  it('never runs ahead of the visitor: buffering stays a few chunks however large the file', async () => {
+    const { body, stats } = source(150);
+    vi.mocked(fetchDriveOriginal).mockResolvedValueOnce(new Response(body));
+    const total = await drain(await get(TOKEN_A, 'ph_AAAAAAAAAAAA'), stats);
+    expect(total).toBe(150 * MB);
+    expect(stats.maxAhead).toBeLessThanOrEqual(4); // 150 MB passed through with at most a handful of 1 MB chunks held
+  });
+
+  it('an upstream that fails mid-transfer fails the download instead of ending it quietly', async () => {
+    let sent = 0;
+    const flaky = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (sent++ < 3) controller.enqueue(new Uint8Array(MB));
+        else controller.error(new Error('connection reset'));
+      },
+    });
+    vi.mocked(fetchDriveOriginal).mockResolvedValueOnce(new Response(flaky, { headers: { 'content-length': String(10 * MB) } }));
+    await expect(drain(await get(TOKEN_A, 'ph_AAAAAAAAAAAA'))).rejects.toThrow();
+  });
+});
+
 describe('authorized original download', () => {
   it('streams an assigned photo of a published gallery with safe, private headers', async () => {
     const res = await get(TOKEN_A, 'ph_AAAAAAAAAAAA');

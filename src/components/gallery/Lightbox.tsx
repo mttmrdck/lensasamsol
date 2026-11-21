@@ -284,7 +284,8 @@ export function Lightbox({
               className="g-lb-drive"
               href={download}
               download={photo.filename ?? undefined}
-              rel="noopener"
+              rel="noopener noreferrer"
+              referrerPolicy="no-referrer"
               aria-label="Download this photograph"
               title="Download the original photograph"
             >
