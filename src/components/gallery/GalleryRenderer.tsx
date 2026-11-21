@@ -9,6 +9,7 @@ import { CoverHero } from './CoverHero';
 import { PhotoGrid } from './PhotoGrid';
 import { Lightbox } from './Lightbox';
 import { ExternalArrow, folderActionLabel } from './DriveLink';
+import { DownloadAll } from './DownloadAll';
 import { formatDate, plural } from '../../lib/format';
 
 export interface GalleryRendererProps {
@@ -223,6 +224,7 @@ export function GalleryRenderer(props: GalleryRendererProps) {
                     <p className="g-folio-desc">{descriptionText}</p>
                   )}
                 </div>
+                {mode === 'public' && <DownloadAll photos={sourcePhotos} title={collection.title} />}
                 <div className="g-folio-links">
                   {folderLink && (
                     <a href={collection.folderUrl!} target="_blank" rel="noopener noreferrer">
@@ -271,7 +273,8 @@ export function GalleryRenderer(props: GalleryRendererProps) {
                       </span>
                     )}
                   </div>
-                  <div className="flex flex-wrap gap-x-6 gap-y-3">
+                  <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
+                    {mode === 'public' && <DownloadAll photos={sourcePhotos} title={collection.title} />}
                     {folderLink && (
                       <a
                         className="inline-flex min-h-11 items-center gap-1.5 hover:opacity-70"

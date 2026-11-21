@@ -16,6 +16,7 @@ import { verifyPassword } from './crypto';
 import { publicRoutes } from './routes/public';
 import { adminRoutes } from './routes/admin';
 import { imageRoutes } from './images';
+import { downloadRoutes } from './downloads';
 import { loginSchema } from '../shared/api';
 
 const app = new Hono<AppEnv>();
@@ -77,9 +78,12 @@ app.post('/api/auth/logout', async (c) => {
 app.route('/api/public', publicRoutes);
 app.route('/api/admin', adminRoutes);
 app.route('/img', imageRoutes);
+app.route('/dl', downloadRoutes);
 
 app.all('/api', c=>c.json({error:'not_found'},404));
 app.all('/img', c=>c.json({error:'not_found'},404));
+app.all('/dl', c=>c.json({error:'not_found'},404));
+app.all('/dl/*', c=>c.json({error:'not_found'},404));
 app.all('/img/*', c=>c.json({error:'not_found'},404));
 app.all('/api/*', (c) => c.json({ error: 'not_found' }, 404));
 app.onError((err, c) => {

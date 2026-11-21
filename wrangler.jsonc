@@ -15,7 +15,9 @@
       "/api",
       "/api/*",
       "/img",
-      "/img/*"
+      "/img/*",
+      "/dl",
+      "/dl/*"
     ],
     "binding": "ASSETS"
   },

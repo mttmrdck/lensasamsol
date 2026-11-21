@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.108.1",
+    "client-zip": "^2.5.1",
     "hono": "^4.13.19",
     "lucide-react": "^1.76.0",
     "radix-ui": "^1.8.1",

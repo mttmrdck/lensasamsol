@@ -1,11 +1,11 @@
 import { containDimensions, viewingVariant } from '../../../shared/image-variants';
-import { useImages } from './images';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
-import { ChevronLeft, ChevronRight, GalleryHorizontalEnd, Link2, X, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, GalleryHorizontalEnd, Link2, X, Check } from 'lucide-react';
 import type { PublicPhoto } from '../../../shared/api';
 import type { StyleConfig, ThemeTokens } from '../../../shared/style';
 import { pad3 } from '../../lib/format';
 import { DRIVE_HELPER, ExternalArrow, photoActionLabel, photoTarget } from './DriveLink';
+import { useImages } from './images';
 import { useReducedMotion } from './hooks';
 
 interface Props {
@@ -35,7 +35,7 @@ export function Lightbox({
   allowCopyLink,
 }: Props) {
   const photo = photos[index];
-  const { imgUrl } = useImages();
+  const { imgUrl, downloadUrl } = useImages();
   const total = photos.length;
   const dialogRef = useRef<HTMLDivElement>(null);
   const boundsRef = useRef<HTMLDivElement>(null);
@@ -202,6 +202,7 @@ export function Lightbox({
 
   if (!photo) return null;
   const target = photoTarget(photo);
+  const download = downloadUrl(photo.id);
   const dark = style.color.lightbox === 'darkroom' || theme.dark;
   const vars = {
     '--lb-bg': style.color.lightbox === 'darkroom' ? '#0E0E0D' : theme.bg,
@@ -278,10 +279,24 @@ export function Lightbox({
           )}
         </div>
         <div className="flex items-center gap-1 py-2">
+          {download && (
+            <a
+              className="g-lb-drive"
+              href={download}
+              download={photo.filename ?? undefined}
+              rel="noopener noreferrer"
+              referrerPolicy="no-referrer"
+              aria-label="Download this photograph"
+              title="Download the original photograph"
+            >
+              <Download size={16} strokeWidth={1.75} aria-hidden="true" />
+              <span className="hidden sm:inline">Download</span>
+            </a>
+          )}
           {style.actions.showLightboxButton &&
             (target ? (
               <a
-                className="g-lb-drive"
+                className={download ? 'g-lb-drive g-lb-secondary' : 'g-lb-drive'}
                 href={target.href}
                 target="_blank"
                 rel="noopener noreferrer"

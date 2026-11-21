@@ -12,6 +12,8 @@ export function useImages() {
       imgUrl: (id: string, v: ImageVariant) => imgUrl(id, v, token),
       srcSet: (id: string, w: number, h: number, maxVariant?: ImageVariant) =>
         srcSet(id, w, h, token, maxVariant),
+      /** Original-photo download for visitors; null in the owner preview (no share token, nothing to authorize). */
+      downloadUrl: (id: string): string | null => (token ? `/dl/t/${token}/${id}` : null),
     }),
     [token],
   );
