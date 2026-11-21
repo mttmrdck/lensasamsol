@@ -8,6 +8,7 @@
   ],
   "workers_dev": false,
   "preview_urls": false,
+  "images": { "binding": "IMAGES" },
   "assets": {
     "not_found_handling": "single-page-application",
     "run_worker_first": [
@@ -47,6 +48,7 @@
       "name": "lensasamsol-test",
       "workers_dev": false,
       "preview_urls": false,
+      "images": { "binding": "IMAGES" },
       "vars": {
         "APP_ENV": "development",
         "DEMO_MODE": "true",
@@ -65,10 +67,11 @@
       "name": "lensasamsol-staging",
       "workers_dev": true,
       "preview_urls": false,
+      "images": { "binding": "IMAGES" },
       "vars": {
         "APP_ENV": "staging",
         "DEMO_MODE": "false",
-        "PUBLIC_ORIGIN": "https://lensasamsol-staging.zafranakif74.workers.dev"
+        "PUBLIC_ORIGIN": "https://lensasamsol-staging.lnoa.workers.dev"
       },
       "secrets": {
         "required": [
