@@ -91,16 +91,33 @@ test.describe('client gallery entrance', () => {
     await expect(entrance(page)).toHaveCount(0);
   });
 
-  test('7: Skip intro reveals the gallery at once', async ({ page, request }) => {
-    await page.addInitScript(
-      () => ((window as unknown as { __LSG_INTRO_SPEED__: number }).__LSG_INTRO_SPEED__ = 0.05),
-    );
+  test('7: no Skip button; Escape releases the gallery', async ({ page, request }) => {
+    await page.addInitScript(() => ((window as unknown as { __LSG_INTRO_SPEED__: number }).__LSG_INTRO_SPEED__ = 0.05));
     await page.goto(await link(request, 'col_demo_coast'));
-    const skip = page.getByRole('button', { name: 'Skip intro' });
-    await expect(skip).toBeVisible();
-    await skip.click();
+    await expect(entrance(page)).toBeAttached();
+    await expect(page.getByRole('button', { name: 'Skip intro' })).toHaveCount(0);
+    await page.keyboard.press('Escape');
     await expect(entrance(page)).not.toBeAttached({ timeout: 1500 });
-    await expect(page.locator('.g-hero-text').first()).toHaveCSS('opacity', '1', { timeout: 2000 });
+  });
+
+  test('viewport portal remains centered through rotation, with no circular housing', async ({ page, request }) => {
+    await page.addInitScript(() => ((window as unknown as { __LSG_INTRO_SPEED__: number }).__LSG_INTRO_SPEED__ = 0));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(await link(request, 'col_demo_coast'));
+    await expect(page.getByTestId('iris-intro')).toBeAttached();
+    for (const size of [{width:390,height:844}, {width:844,height:390}, {width:390,height:690}]) {
+      await page.setViewportSize(size);
+      await expect.poll(() => page.getByTestId('iris-intro').evaluate(el => {
+        const r = el.getBoundingClientRect();
+        const center = el.getAttribute('data-center')!.split(',').map(Number);
+        return { width: Math.round(r.width), height: Math.round(r.height), center };
+      })).toEqual({ ...size, center:[size.width/2,size.height/2] });
+      expect(await entrance(page).evaluate(el => el.parentElement === document.body)).toBe(true);
+      await expect(page.getByTestId('iris-intro').locator('circle,clipPath')).toHaveCount(0);
+    }
+    // The independent timer handles an animation that never completes.
+    await expect(entrance(page)).not.toBeAttached({ timeout:3000 });
+    expect(await page.evaluate(() => document.body.style.overflow)).toBe('');
   });
 
   test('8: reduced motion goes straight to the gallery', async ({ browser, request }) => {
@@ -146,12 +163,17 @@ test.describe('client gallery entrance', () => {
   });
 
   test('14: a slow cover never traps the visitor', async ({ page, request }) => {
+    // Measure the image/entrance deadline, not an unrelated external font CSS connection timeout.
+    await page.route('https://fonts.googleapis.com/**', (route) =>
+      route.fulfill({ contentType: 'text/css', body: '' }),
+    );
     await page.route('**/img/t/**', async (route) => {
       await new Promise((r) => setTimeout(r, 6000));
       await route.continue().catch(() => {});
     });
     const start = Date.now();
     await page.goto(await link(request, 'col_demo_coast'));
+    await expect(entrance(page)).toBeAttached();
     await expect(entrance(page)).not.toBeAttached({ timeout: 4000 });
     expect(Date.now() - start).toBeLessThan(4500);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
@@ -202,4 +224,14 @@ test.describe('client gallery entrance', () => {
       await ctx.close();
     });
   }
+});
+
+test('pending gallery data uses the same edge-to-edge portal and restores root backgrounds', async ({page,request}) => {
+  const url=await link(request,'col_demo_coast');
+  await page.route('**/api/public/g/**',async route=>{await new Promise(r=>setTimeout(r,1200));await route.continue()});
+  await page.goto(url,{waitUntil:'domcontentloaded'});
+  await expect(entrance(page)).toHaveAttribute('data-state','pending');
+  expect(await entrance(page).evaluate(el=>el.parentElement===document.body)).toBe(true);
+  await expect(entrance(page)).not.toBeAttached({timeout:5000});
+  expect(await page.evaluate(()=>[document.body.style.background,document.documentElement.style.background])).toEqual(['','']);
 });

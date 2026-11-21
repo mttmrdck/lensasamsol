@@ -159,7 +159,7 @@ export default function CollectionsPage() {
       </div>
 
       {q.isPending ? (
-        <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 8 }, (_, i) => (
             <div key={i} className="aspect-[3/2.6] animate-pulse rounded-ui bg-placeholder" />
           ))}
@@ -171,7 +171,7 @@ export default function CollectionsPage() {
             : 'No client galleries match these filters.'}
         </p>
       ) : view === 'grid' ? (
-        <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
           {list.map((c) => (
             <CollectionCard key={c.id} c={c} />
           ))}

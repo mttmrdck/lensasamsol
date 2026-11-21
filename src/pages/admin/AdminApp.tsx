@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FolderSync, Images, LayoutGrid, LogOut, Menu, Paintbrush, Settings, X } from 'lucide-react';
@@ -70,6 +70,8 @@ const NAV = [
 
 function Shell({ children, demo }: { children: ReactNode; demo: boolean }) {
   const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -82,6 +84,31 @@ function Shell({ children, demo }: { children: ReactNode; demo: boolean }) {
     queryFn: () => api<{ studioName: string }>('/api/admin/settings'),
   });
   useEffect(() => setOpen(false), [location.pathname]);
+
+  useEffect(() => {
+    if (!open) return;
+    const trigger = triggerRef.current;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const focusable = () => Array.from(menuRef.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled])') ?? []).filter(el => el.getClientRects().length);
+    focusable()[0]?.focus();
+    const key = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); setOpen(false); }
+      if (event.key !== 'Tab') return;
+      const list = focusable(), first = list[0], last = list.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    document.addEventListener('keydown', key);
+    return () => { document.body.style.overflow = previous; document.removeEventListener('keydown', key); if (trigger?.getClientRects().length) trigger.focus(); };
+  }, [open]);
+
+  useEffect(() => {
+    const desktop = matchMedia('(min-width: 1024px)');
+    const closeOnDesktop = () => { if (desktop.matches) setOpen(false); };
+    desktop.addEventListener('change', closeOnDesktop);
+    return () => desktop.removeEventListener('change', closeOnDesktop);
+  }, []);
 
   const logout = async () => {
     await post('/api/auth/logout');
@@ -165,12 +192,12 @@ function Shell({ children, demo }: { children: ReactNode; demo: boolean }) {
   );
 
   return (
-    <div className="min-h-svh bg-canvas text-ink">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[240px] border-r border-line bg-canvas lg:block">
+    <div className="studio-shell min-h-svh bg-canvas text-ink">
+      <aside className="studio-rail fixed inset-y-0 left-0 z-30 hidden w-[240px] border-r border-line bg-canvas lg:block">
         {rail}
       </aside>
       {open && (
-        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
+        <div ref={menuRef} className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
           <button
             type="button"
             className="absolute inset-0 bg-ink/25"
@@ -182,10 +209,11 @@ function Shell({ children, demo }: { children: ReactNode; demo: boolean }) {
           </aside>
         </div>
       )}
-      <div className="lg:pl-[240px]">
+      <div className="lg:pl-[240px]" inert={open || undefined}>
         <div className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-line bg-canvas/95 px-4 backdrop-blur lg:hidden">
           <button
             type="button"
+            ref={triggerRef}
             onClick={() => setOpen(true)}
             className="-ml-1 rounded-ui p-2 hover:bg-subtle"
             aria-label="Open menu"
@@ -195,7 +223,7 @@ function Shell({ children, demo }: { children: ReactNode; demo: boolean }) {
           <img src="/brand/icon-48.png" alt="" width={22} height={22} className="h-[22px] w-[22px]" />
           <span className="font-display text-[19px]">{settings.data?.studioName ?? 'lensasamsol'}</span>
         </div>
-        <main className="mx-auto max-w-[1360px] px-4 py-6 sm:px-8 sm:py-8">{children}</main>
+        <main className="studio-main mx-auto max-w-[1360px] px-4 py-6 sm:px-8 sm:py-10">{children}</main>
       </div>
     </div>
   );

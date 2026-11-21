@@ -144,7 +144,7 @@ const Tile = memo(function Tile({
       ) : (
         <img
           src={imgUrl(photo.id, box.w > 700 ? 'l' : 'm')}
-          srcSet={srcSet(photo.id, photo.w, photo.h)}
+          srcSet={srcSet(photo.id, photo.w, photo.h, !photo.credit && box.w > 800 ? 'xl' : 'l')}
           sizes={`${box.w}px`}
           width={box.w}
           height={box.h}

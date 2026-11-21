@@ -60,7 +60,11 @@ export default function CollectionPage() {
   if (q.isPending) {
     // An entrance is likely: hold a dark surface instead of the light skeleton, so there is no white flash.
     if (entrance.state === 'pending')
-      return <div className="min-h-svh bg-[#0E0E0D]" aria-busy="true" aria-label="Loading gallery" />;
+      return <>
+        <div className="min-h-svh bg-[#161715]" aria-busy="true" aria-label="Loading gallery" />
+        <ClientGalleryEntrance state={entrance.state} onReveal={entrance.onReveal}
+          onOpened={entrance.onOpened} onFaded={entrance.onFaded} />
+      </>;
     return (
       <div className="min-h-svh bg-canvas" aria-busy="true" aria-label="Loading gallery">
         <div className="h-[78svh] animate-pulse bg-placeholder" />
@@ -111,7 +115,6 @@ export default function CollectionPage() {
         onReveal={entrance.onReveal}
         onOpened={entrance.onOpened}
         onFaded={entrance.onFaded}
-        onSkip={entrance.skip}
       />
     </>
   );

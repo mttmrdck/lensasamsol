@@ -13,16 +13,20 @@ export function useReducedMotion(): boolean {
   return reduced;
 }
 
-export function useElementWidth(ref: RefObject<HTMLElement | null>): number {
+export function useElementWidth(ref: RefObject<HTMLElement | null>, enabled = true): number {
   const [width, setWidth] = useState(0);
   useLayoutEffect(() => {
+    if (!enabled) {
+      setWidth(0);
+      return;
+    }
     const el = ref.current;
     if (!el) return;
     setWidth(Math.floor(el.getBoundingClientRect().width));
     const ro = new ResizeObserver(([entry]) => setWidth(Math.floor(entry.contentRect.width)));
     ro.observe(el);
     return () => ro.disconnect();
-  }, [ref]);
+  }, [ref, enabled]);
   return width;
 }
 

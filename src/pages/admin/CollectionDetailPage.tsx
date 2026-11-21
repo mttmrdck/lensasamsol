@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   ArrowLeft,
@@ -34,7 +34,7 @@ import {
 import { CopyClientLinkButton, StatusPill, clientUrl } from '../../components/admin/bits';
 
 type PhotoFilter = 'all' | 'assigned' | 'unassigned' | 'featured';
-type ConfirmKind = null | 'delete' | 'unpublish' | 'regenerate' | 'revoke';
+type ConfirmKind = null | 'publish' | 'delete' | 'unpublish' | 'regenerate' | 'revoke';
 
 export default function CollectionDetailPage() {
   const { id = '' } = useParams();
@@ -42,6 +42,8 @@ export default function CollectionDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const key = ['collection', id];
+  const curationKey = ['curation', id];
+  const pendingCuration = useIsMutating({ mutationKey: curationKey });
   const q = useQuery({
     queryKey: key,
     queryFn: () => api<AdminCollectionDetail>(`/api/admin/collections/${id}`),
@@ -51,20 +53,22 @@ export default function CollectionDetailPage() {
   const [density, setDensity] = useState<'compact' | 'comfortable'>('comfortable');
   const [confirm, setConfirm] = useState<ConfirmKind>(null);
 
-  const refresh = () => {
-    qc.invalidateQueries({ queryKey: key });
-    qc.invalidateQueries({ queryKey: ['collections'] });
-    qc.invalidateQueries({ queryKey: ['overview'] });
-    qc.invalidateQueries({ queryKey: ['preview', id] });
-  };
+  const refresh = () => Promise.all([
+    qc.invalidateQueries({ queryKey: key }),
+    qc.invalidateQueries({ queryKey: ['collections'] }),
+    qc.invalidateQueries({ queryKey: ['overview'] }),
+    qc.invalidateQueries({ queryKey: ['preview', id] }),
+  ]);
   const errorToast = (e: unknown) => toast.error(e instanceof ApiError ? e.message : 'Something went wrong.');
 
   const update = useMutation({
+    mutationKey: curationKey,
     mutationFn: (body: Record<string, unknown>) => patch(`/api/admin/collections/${id}`, body),
     onSuccess: refresh,
     onError: errorToast,
   });
   const sync = useMutation({
+    mutationKey: curationKey,
     mutationFn: () =>
       post<{
         status: string;
@@ -75,8 +79,8 @@ export default function CollectionDetailPage() {
         skippedUnsupported: number;
         error: string | null;
       }>(`/api/admin/collections/${id}/sync`),
-    onSuccess: (r) => {
-      refresh();
+    onSuccess: async (r) => {
+      await refresh();
       const parts = [`+${r.added} new`, `${r.removed} removed`];
       if (r.updated) parts.push(`${r.updated} replaced`);
       if (r.renamed) parts.push(`${r.renamed} renamed`);
@@ -89,8 +93,8 @@ export default function CollectionDetailPage() {
             : `Synced: ${parts.join(', ')}.`,
         );
     },
-    onError: (e) => {
-      refresh();
+    onError: async (e) => {
+      await refresh();
       errorToast(e);
     },
   });
@@ -135,6 +139,7 @@ export default function CollectionDetailPage() {
     onError: errorToast,
   });
   const photoPatch = useMutation({
+    mutationKey: curationKey,
     mutationFn: ({ photoId, body }: { photoId: string; body: { assigned?: boolean; featured?: boolean } }) =>
       patch(`/api/admin/collections/${id}/photos/${photoId}`, body),
     onMutate: async ({ photoId, body }) => {
@@ -159,10 +164,11 @@ export default function CollectionDetailPage() {
     onSettled: refresh,
   });
   const bulk = useMutation({
+    mutationKey: curationKey,
     mutationFn: (body: { ids: string[]; assigned: boolean }) =>
       post(`/api/admin/collections/${id}/photos/bulk`, body),
-    onSuccess: (_, b) => {
-      refresh();
+    onSuccess: async (_, b) => {
+      await refresh();
       toast.success(
         `${plural(b.ids.length, 'photo')} ${b.assigned ? 'assigned to' : 'removed from'} this client gallery.`,
       );
@@ -170,6 +176,7 @@ export default function CollectionDetailPage() {
     onError: errorToast,
   });
 
+  const publicationBlocked = pendingCuration > 0 || q.isFetching || q.isError;
   const c = q.data;
   const photos = useMemo(() => {
     const t = search.trim().toLowerCase();
@@ -267,9 +274,9 @@ export default function CollectionDetailPage() {
             ) : (
               <Button
                 variant="primary"
-                onClick={() => publish.mutate(true)}
+                onClick={() => { if (!publicationBlocked) setConfirm('publish'); }}
                 loading={publish.isPending}
-                disabled={c.photoCount === 0}
+                disabled={c.photoCount === 0 || publicationBlocked}
                 title={c.photoCount === 0 ? 'Assign photos to this client first' : undefined}
               >
                 Publish
@@ -570,7 +577,7 @@ export default function CollectionDetailPage() {
           </div>
         </div>
         <p className="text-[12px] leading-5 text-slate">
-          Featured photos open the gallery as “Selected moments”, in the order you feature them. Only assigned
+          Featured flags remain available for your curation. The selected cover leads the client gallery. Only assigned
           photos can be the cover or featured.
         </p>
 
@@ -654,6 +661,15 @@ export default function CollectionDetailPage() {
         </div>
       </section>
 
+      <Confirm
+        open={confirm === 'publish'}
+        onOpenChange={open => !open && setConfirm(null)}
+        title={`Share “${c.title}” with your client?`}
+        body={`${assignedCount} assigned photographs will become visible to anyone with this gallery’s link. Confirm that this selection belongs to ${c.clientName || 'the intended client'}. Use Preview Client Experience to review the photographs before publishing.`}
+        confirmLabel="Publish gallery"
+        loading={publish.isPending || publicationBlocked}
+        onConfirm={() => { if (!publicationBlocked) publish.mutate(true); }}
+      />
       <Confirm
         open={confirm === 'delete'}
         onOpenChange={(o) => !o && setConfirm(null)}

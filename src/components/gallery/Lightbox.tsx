@@ -1,3 +1,4 @@
+import { containDimensions, viewingVariant } from '../../../shared/image-variants';
 import { useImages } from './images';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { ChevronLeft, ChevronRight, GalleryHorizontalEnd, Link2, X, Check } from 'lucide-react';
@@ -37,17 +38,27 @@ export function Lightbox({
   const { imgUrl } = useImages();
   const total = photos.length;
   const dialogRef = useRef<HTMLDivElement>(null);
+  const boundsRef = useRef<HTMLDivElement>(null);
+  const [bounds, setBounds] = useState({ width: 0, height: 0, dpr: 1 });
   const closeRef = useRef<HTMLButtonElement>(null);
   const reduced = useReducedMotion();
   const [idle, setIdle] = useState(false);
   const [drag, setDrag] = useState(0);
   const [hiLoaded, setHiLoaded] = useState(false);
+  const [loLoaded, setLoLoaded] = useState(false);
+  const [loFailed, setLoFailed] = useState(false);
   const [failed, setFailed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [strip, setStrip] = useState(
     () => typeof matchMedia !== 'undefined' && matchMedia('(min-width: 900px)').matches,
   );
   const pointer = useRef<{ x: number; y: number; id: number; t: number } | null>(null);
+  const hi = photo
+    ? imgUrl(
+        photo.id,
+        viewingVariant(photo.w, photo.h, bounds.width, bounds.height, bounds.dpr, photo.credit ? 'l' : 'xl'),
+      )
+    : '';
 
   const go = useCallback(
     (d: number) => {
@@ -60,10 +71,37 @@ export function Lightbox({
   // Reset per-photo state.
   useLayoutEffect(() => {
     setHiLoaded(false);
+    setLoLoaded(false);
+    setLoFailed(false);
     setFailed(false);
     setDrag(0);
     setCopied(false);
   }, [photo?.id]);
+
+  // A responsive tier is a new request even when the photograph stays the same.
+  // Preserve the loaded small layer while an upgraded request loads or fails.
+  useLayoutEffect(() => {
+    setHiLoaded(false);
+    setFailed(false);
+  }, [hi]);
+
+  // Measure the actual available theatre after toolbar/footer and safe-area layout.
+  useLayoutEffect(() => {
+    const el = boundsRef.current;
+    if (!el) return;
+    const measure = () =>
+      setBounds({ width: el.clientWidth, height: el.clientHeight, dpr: window.devicePixelRatio || 1 });
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    window.visualViewport?.addEventListener('resize', measure);
+    window.addEventListener('resize', measure);
+    return () => {
+      observer.disconnect();
+      window.visualViewport?.removeEventListener('resize', measure);
+      window.removeEventListener('resize', measure);
+    };
+  }, []);
 
   // Lock background scroll; restore on close.
   useEffect(() => {
@@ -141,14 +179,18 @@ export function Lightbox({
 
   // Preload adjacent previews only (never originals).
   useEffect(() => {
+    if (bounds.width <= 0 || bounds.height <= 0) return;
     const imgs = [photos[index + 1], photos[index - 1]].filter(Boolean).map((p) => {
       const im = new Image();
       im.decoding = 'async';
-      im.src = imgUrl(p.id, 'l');
+      im.src = imgUrl(
+        p.id,
+        viewingVariant(p.w, p.h, bounds.width, bounds.height, bounds.dpr, p.credit ? 'l' : 'xl'),
+      );
       return im;
     });
     return () => imgs.forEach((im) => (im.src = ''));
-  }, [index, photos, imgUrl]);
+  }, [index, photos, imgUrl, bounds]);
 
   // Keep the current filmstrip thumb in view.
   useEffect(() => {
@@ -210,10 +252,10 @@ export function Lightbox({
     }
   };
 
-  const lo = imgUrl(photo.id, 'm');
-  const hi = imgUrl(photo.id, 'l');
-  const winStart = Math.max(0, index - 30);
-  const filmstrip = photos.slice(winStart, Math.min(total, index + 31));
+  const fit = containDimensions(photo.w, photo.h, bounds.width, bounds.height);
+  const lo = imgUrl(photo.id, 's');
+  const winStart = Math.max(0, index - 6);
+  const filmstrip = photos.slice(winStart, Math.min(total, index + 7));
 
   return (
     <div
@@ -292,19 +334,29 @@ export function Lightbox({
         }}
       >
         <div
-          className="pointer-events-none absolute inset-y-2 inset-x-0 flex items-center justify-center sm:inset-x-[72px]"
+          ref={boundsRef}
+          className="g-lb-bounds pointer-events-none"
           style={{
             transform: drag ? `translateX(${drag}px)` : undefined,
             transition: drag ? 'none' : reduced ? 'none' : 'transform 260ms cubic-bezier(.22,1,.36,1)',
           }}
         >
-          {failed ? (
+          {failed && loFailed ? (
             <div className="max-w-[34ch] text-center text-[14px] leading-6 opacity-75">
               This preview couldn’t be loaded.
               {target?.kind === 'drive' ? ' The original may still be available in Google Drive.' : ''}
             </div>
           ) : (
-            <div className="relative h-full w-full">
+            <div
+              className="g-lb-picture"
+              style={{ width: fit.width, height: fit.height }}
+              aria-busy={!hiLoaded && !failed}
+            >
+              {!hiLoaded && !loLoaded && (
+                <span className="g-lb-status" role="status">
+                  Loading preview…
+                </span>
+              )}
               <img
                 key={`lo-${photo.id}`}
                 className="g-lb-img"
@@ -312,23 +364,32 @@ export function Lightbox({
                 alt=""
                 aria-hidden="true"
                 draggable={false}
-                style={{ aspectRatio: `${photo.w} / ${photo.h}`, opacity: hiLoaded ? 0 : 1 }}
+                onLoad={() => setLoLoaded(true)}
+                onError={() => setLoFailed(true)}
+                style={{ width: fit.width, height: fit.height, opacity: hiLoaded ? 0 : loLoaded ? 1 : 0 }}
               />
               <img
-                key={`hi-${photo.id}`}
+                key={`hi-${photo.id}-${hi}`}
                 className="g-lb-img"
-                src={hi}
+                src={bounds.width > 0 ? hi : undefined}
+                fetchPriority="high"
                 alt={`Photograph ${index + 1} of ${total}`}
                 draggable={false}
                 decoding="async"
                 onLoad={() => setHiLoaded(true)}
                 onError={() => setFailed(true)}
                 style={{
-                  aspectRatio: `${photo.w} / ${photo.h}`,
+                  width: fit.width,
+                  height: fit.height,
                   opacity: hiLoaded ? 1 : 0,
                   transition: reduced ? 'none' : 'opacity 280ms cubic-bezier(.22,1,.36,1)',
                 }}
               />
+              {failed && loLoaded && (
+                <span className="g-lb-status g-lb-status-bottom" role="status">
+                  Full preview unavailable. Showing a smaller preview.
+                </span>
+              )}
             </div>
           )}
         </div>

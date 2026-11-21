@@ -20,7 +20,7 @@ export default function DashboardPage() {
   const d = q.data;
   return (
     <div className="flex flex-col gap-8">
-      <PageHeader title="Overview">
+      <PageHeader title="Your studio" sub="From the first selection to the final share.">
         <Link
           to="/admin/collections/new"
           className="inline-flex h-9 items-center gap-2 rounded-ui bg-ink px-3.5 text-[14px] font-medium text-white hover:bg-ink-2"
@@ -29,6 +29,7 @@ export default function DashboardPage() {
         </Link>
       </PageHeader>
 
+      {q.isError && <Callout tone="err" title="Studio overview unavailable">Refresh this page to try again.</Callout>}
       {d?.drive.lastError && (
         <Callout
           tone="err"
@@ -43,7 +44,7 @@ export default function DashboardPage() {
         </Callout>
       )}
 
-      <dl className="tnum grid grid-cols-2 overflow-hidden rounded-ui border border-line bg-surface text-[13px] sm:grid-cols-4 [&>div]:border-line [&>div]:px-4 [&>div]:py-3">
+      <dl className="studio-status tnum grid grid-cols-2 border-b border-line text-[13px] sm:grid-cols-4 [&>div]:border-line [&>div]:px-4 [&>div]:py-5">
         <div className="border-b border-r sm:border-b-0">
           <dt className="text-slate">Google Drive</dt>
           <dd className="mt-1 truncate font-medium">
@@ -79,13 +80,13 @@ export default function DashboardPage() {
 
       <section className="flex flex-col gap-4">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-[15px] font-semibold">Recent client galleries</h2>
+          <h2 className="font-display text-[24px] tracking-[-0.025em]">Recent client galleries</h2>
           <Link to="/admin/collections" className="text-[13px] text-slate hover:text-ink">
             View all client galleries
           </Link>
         </div>
         {q.isPending ? (
-          <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 4 }, (_, i) => (
               <div key={i} className="aspect-[3/2.6] animate-pulse rounded-ui bg-placeholder" />
             ))}
@@ -104,7 +105,7 @@ export default function DashboardPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
             {d?.recent.map((c) => (
               <CollectionCard key={c.id} c={c} />
             ))}
@@ -114,7 +115,7 @@ export default function DashboardPage() {
 
       {d && d.runs.length > 0 && (
         <section className="flex flex-col gap-3">
-          <h2 className="text-[15px] font-semibold">Recent syncs</h2>
+          <h2 className="font-display text-[24px] tracking-[-0.025em]">Recent syncs</h2>
           <ul className="divide-y divide-line rounded-ui border border-line bg-surface text-[13px]">
             {d.runs.map((r) => (
               <li

@@ -193,7 +193,7 @@ export function GalleryRenderer(props: GalleryRendererProps) {
             )}
           </section>
 
-          <footer className="border-t border-[var(--g-line)]">
+          <footer className="g-edition-footer border-t border-[var(--g-line)]">
             <div className="g-wrap flex flex-col gap-6 py-12 text-[13px] sm:flex-row sm:items-start sm:justify-between">
               <div className="flex flex-col gap-1.5">
                 <span className="text-[14px] font-medium">Photographed by {studio.name}</span>

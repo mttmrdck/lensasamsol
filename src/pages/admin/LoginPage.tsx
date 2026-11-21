@@ -35,7 +35,7 @@ export default function LoginPage({ me }: { me?: Me }) {
   };
 
   return (
-    <main className="grid min-h-svh place-items-center bg-canvas px-4 py-12">
+    <main className="studio-login grid min-h-svh place-items-center bg-canvas px-4 py-12">
       <div className="w-full max-w-[400px]">
         <div className="mb-8 flex flex-col items-center gap-3">
           <img src="/brand/icon-192.png" alt="" width={56} height={56} className="h-14 w-14" />
@@ -43,10 +43,10 @@ export default function LoginPage({ me }: { me?: Me }) {
         </div>
         <form
           onSubmit={submit}
-          className="flex flex-col gap-5 rounded-[8px] border border-line bg-surface p-8"
+          className="flex flex-col gap-6 border-y border-line py-8"
         >
           <div className="flex flex-col gap-1">
-            <h1 className="text-[20px] font-semibold tracking-[-0.015em]">Sign in</h1>
+            <h1 className="font-display text-[36px] tracking-[-0.03em]">Sign in</h1>
             <p className="text-[14px] text-slate">Manage collections, Drive folders and gallery design.</p>
           </div>
           {me && !me.configured && (
@@ -79,7 +79,7 @@ export default function LoginPage({ me }: { me?: Me }) {
           )}
         </form>
         <p className="mt-6 text-center text-[12px] text-muted">
-          This studio has a single owner account. There is no public sign-up.
+          Private studio access. Client galleries open through their individual links.
         </p>
       </div>
     </main>

@@ -67,64 +67,13 @@ export function fullRevealApothem(w: number, h: number, cx = w / 2, cy = h / 2):
   );
 }
 
-/**
- * Where the iris should open: the cover photograph's focal point (object-position places the image's
- * focal point at exactly that percentage of its box), kept far enough inside the photo and the viewport
- * for the closed lens to sit on the picture. Falls back to the viewport centre.
- */
-export function anchorFromRect(
-  rect: { left: number; top: number; width: number; height: number } | null,
-  focal: { x: number; y: number } | null,
-  w: number,
-  h: number,
-  lens: number,
-): { x: number; y: number } {
-  if (!rect || rect.width < 40 || rect.height < 40) return { x: w / 2, y: h / 2 };
-  const fx = focal?.x ?? 0.5;
-  const fy = focal?.y ?? 0.5;
-  const left = Math.max(0, rect.left);
-  const top = Math.max(0, rect.top);
-  const right = Math.min(w, rect.left + rect.width);
-  const bottom = Math.min(h, rect.top + rect.height);
-  const pad = Math.min(lens * 1.08, (right - left) / 2, (bottom - top) / 2);
-  const x = Math.min(right - pad, Math.max(left + pad, rect.left + fx * rect.width));
-  const y = Math.min(bottom - pad, Math.max(top + pad, rect.top + fy * rect.height));
-  return { x, y };
-}
-
-export const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-export const easeInCubic = (t: number) => t * t * t;
-export const easeOutQuint = (t: number) => 1 - Math.pow(1 - t, 5);
 export const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
+export const easeInOutCubic = (t: number) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
-/**
- * The choreography as a pure function of elapsed time (ms). Returns everything the renderer needs.
- *  A   0–180    lens fades in at its closed pose
- *  B   180–950  mechanical opening (ease-in-out): apothem 7% → 88% of the lens, blades turn 34°
- *  C   760–1420 photographic reveal: lens and opening grow until the hexagon covers the viewport
- */
-export const TIMELINE = {
-  appearEnd: 180,
-  openStart: 180,
-  openEnd: 950,
-  revealStart: 760,
-  revealEnd: 1420,
-} as const;
-
-export function irisFrame(t: number, lens: number, full: number) {
-  const pA = clamp01(t / TIMELINE.appearEnd);
-  const pB = easeInOutCubic(clamp01((t - TIMELINE.openStart) / (TIMELINE.openEnd - TIMELINE.openStart)));
-  const pC = easeInCubic(clamp01((t - TIMELINE.revealStart) / (TIMELINE.revealEnd - TIMELINE.revealStart)));
-  const openA = lens * (0.07 + 0.81 * pB);
-  const apothem = openA + (full - openA) * pC;
-  const lensR = lens + (full * 1.35 - lens) * pC;
-  const theta = ((34 * pB + 10 * pC) * Math.PI) / 180;
-  return {
-    appear: easeOutQuint(pA),
-    apothem,
-    lensR,
-    theta,
-    done: t >= TIMELINE.revealEnd,
-    revealProgress: pC,
-  };
+/** One continuous mechanical opening, no icon appearance or secondary zoom. */
+export const TIMELINE = { revealEnd: 1100 } as const;
+export function irisFrame(t: number, _lens: number, full: number) {
+  const progress = easeInOutCubic(clamp01(t / TIMELINE.revealEnd));
+  return { apothem: full * progress, theta: progress * Math.PI / 10,
+    done: t >= TIMELINE.revealEnd, revealProgress: progress };
 }

@@ -32,6 +32,8 @@ test.describe.serial('client gallery isolation', () => {
     await page.getByLabel('Gallery title').fill('E2E Gallery A');
     await page.getByRole('radio', { name: /Every photo in this folder/ }).click();
     await page.getByRole('button', { name: 'Publish & Generate Link' }).click();
+    await expect(page.getByRole('alertdialog')).toContainText('E2E Gallery A');
+    await page.getByRole('button', { name: 'Publish gallery', exact: true }).click();
     await expect(page).toHaveURL(/\/admin\/collections\/col_/);
     idA = new URL(page.url()).pathname.split('/').pop()!;
 
@@ -76,6 +78,8 @@ test.describe.serial('client gallery isolation', () => {
     for (const i of [0, 1, 2]) await tiles.nth(i).click();
     await expect(page.getByTestId('assign-summary')).toContainText('3 assigned to this client');
     await page.getByRole('button', { name: 'Publish', exact: true }).click();
+    await expect(page.getByRole('alertdialog')).toContainText('assigned photographs');
+    await page.getByRole('button', { name: 'Publish gallery', exact: true }).click();
     await expect(page.getByText('Shared', { exact: true }).first()).toBeVisible();
     const after = await detail(request, idB);
     expect(after.photos.filter((p) => p.assigned)).toHaveLength(3);

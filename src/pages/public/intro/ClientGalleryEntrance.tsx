@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { useEffect, useRef } from 'react';
 import { IrisIntro } from './IrisIntro';
 import type { EntranceState } from './useGalleryEntrance';
@@ -7,17 +8,16 @@ interface Props {
   onReveal: () => void;
   onOpened: () => void;
   onFaded: () => void;
-  onSkip: () => void;
 }
 
 /**
  * The client-gallery entrance overlay. Rendered only by the public /g/:token route — never by the shared
  * GalleryRenderer, the editor preview, the client preview or any admin page.
  */
-export function ClientGalleryEntrance({ state, onReveal, onOpened, onFaded, onSkip }: Props) {
+export function ClientGalleryEntrance({ state, onReveal, onOpened, onFaded }: Props) {
   const fadeRef = useRef<HTMLDivElement>(null);
 
-  // Fallback / skip path: a short opacity fade, then unmount (transitionend, with a safety net).
+  // Fallback / Escape path: a short opacity fade, then unmount (transitionend, with a safety net).
   useEffect(() => {
     if (state !== 'fading') return;
     const el = fadeRef.current;
@@ -28,12 +28,13 @@ export function ClientGalleryEntrance({ state, onReveal, onOpened, onFaded, onSk
       finished = true;
       onFaded();
     };
-    requestAnimationFrame(() => {
+    const frame = requestAnimationFrame(() => {
       el.style.opacity = '0';
     });
     el.addEventListener('transitionend', finish, { once: true });
     const safety = window.setTimeout(finish, 450);
     return () => {
+      cancelAnimationFrame(frame);
       el.removeEventListener('transitionend', finish);
       window.clearTimeout(safety);
     };
@@ -41,10 +42,10 @@ export function ClientGalleryEntrance({ state, onReveal, onOpened, onFaded, onSk
 
   if (state === 'off' || state === 'done') return null;
 
-  return (
+  return createPortal(
     <div
       ref={fadeRef}
-      className="fixed inset-0 z-[80] transition-opacity duration-300 ease-[cubic-bezier(.22,1,.36,1)]"
+      className="g-entrance"
       data-testid="client-entrance"
       data-state={state}
     >
@@ -58,15 +59,6 @@ export function ClientGalleryEntrance({ state, onReveal, onOpened, onFaded, onSk
           onDone={onOpened}
         />
       )}
-      {(state === 'closed' || state === 'opening') && (
-        <button
-          type="button"
-          onClick={onSkip}
-          className="absolute bottom-[max(20px,env(safe-area-inset-bottom))] left-1/2 z-[81] min-h-11 -translate-x-1/2 rounded-full px-4 text-[12px] tracking-[0.01em] text-white/55 transition-colors hover:text-white/90 focus-visible:text-white focus-visible:outline-1 focus-visible:outline-white/60"
-        >
-          Skip intro
-        </button>
-      )}
-    </div>
+    </div>, document.body,
   );
 }

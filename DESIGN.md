@@ -62,25 +62,30 @@ Cover names below describe stored legacy preset values. All photographic covers 
 All theme text pairs exceed 7:1 (primary) and 4.5:1 (secondary); custom backgrounds derive text colours
 that are unit-tested to stay ≥ 4.5:1.
 
-## Client gallery entrance — the camera iris
+## Client gallery entrance — full-viewport diaphragm
 
-When a client opens their link for the first time in a tab, a graphite six-blade iris (rebuilt as vector
-geometry from the brand's aperture mark) sits centred on a near-black surface. Its blades swing open with an
-ease-in-out mechanical motion, the hexagonal opening twisting 34° as it widens, while the lens glides to the
-cover photograph. The real gallery is already rendered underneath, so what shows through the opening is
-the client's own cover photograph. The lens then grows past the viewport corners. Title and caption are already static underneath it; no secondary text reveal follows. Total ≈1.4 s.
+The entire website viewport is the six-blade aperture. A body-level portal isolates it from clipping and transformed ancestors. There is no outer ring, lens housing, logo, caption or Skip Intro control. The aperture begins at zero and opens around the visual viewport centre; its final inscribed circle extends beyond the farthest corner. Fixed inset coverage and ResizeObserver/VisualViewport listeners keep layout coverage and visible centering separate.
 
-| Phase | Time          | What moves                                                                                     |
-| ----- | ------------- | ---------------------------------------------------------------------------------------------- |
-| A     | 0–180 ms      | Lens fades in at its closed pose (1.5% settle, no zoom, no spin)                               |
-| B     | 180–950 ms    | Blades open (apothem 7% → 88% of the lens), opening twists 34°, lens glides to the focal point |
-| C     | 760–1420 ms   | Lens and opening grow until the hexagon's inscribed circle passes every corner                 |
-| D     | ≈1130–1420 ms | Overlay removed; static title and metadata are immediately visible                             |
+Motion: one 1100ms ease-in-out cubic opening with 18° mechanical blade travel, no fade-in, bounce, zoomed icon or per-frame React renders. Six graphite surfaces form a quiet closed composition. The surface behind the blades prevents antialiasing gaps. The normal completion removes the overlay; an independent 2000ms safety timer handles lost frames. Slow/failed hero loading falls back within 1600ms plus a short fade. Pending metadata has a 4500ms bound. Reduced motion bypasses the entrance, including changes while active. Escape remains an accessible emergency exit without visible skip UI.
 
-Rules: once per gallery per tab session; never for `?photo=` deep links, invalid links, reduced motion or
-type-only covers; never on `/`, admin pages, the editor or previews. Skip intro and Esc end it immediately
-(freezing the current frame, then a 300 ms fade). A cover slower than 1.6 s or failing to load fades the lens
-away instead of holding the visitor. No sound, no spring overshoot, no lens flare.
+Rules: public client gallery only, once per gallery per tab, no replay for photo navigation, no intro for deep links, invalid links, admin/editor/preview or typography-only covers. Images use the existing responsive hero candidate, not another original download. Real iPhone toolbar behavior requires device verification; desktop WebKit emulation is not that evidence.
+
+## Private Photographic Edition — coordinated redesign
+
+Chosen composition: photographic cover/page with an uncropped image, ruled studio masthead and an editorial caption. The two alternatives considered were cropped full-bleed covers (loses photographic content) and large typography-first panels (delays photographs). Existing saved themes, pairings, cover choices and layout controls remain authoritative.
+
+- Display: existing selected gallery face, fluid 35–68px desktop titles, 32–48px mobile; tight 1.04 line height. Studio uses existing Young Serif paired with Schibsted Grotesk. No new font family or dependency.
+- Masthead: 68px desktop /58px mobile; understated private-edition descriptor, never an action or access guarantee. Photo/caption share a left edge. Caption closes with a hairline; sequence begins 40px below (24px mobile).
+- Photographs: square corners, native aspect ratios, no hover zoom. Responsive 480/960/1600/2560px tiers and explicit contain-fit viewer remain intact. Small and large collections use the same existing justified/editorial engine and bounded virtualization.
+- Studio: paper #f7f7f2, rail #efefe8, selected navigation #252b25, lines #ddded5. Real operational status stays in a compact horizontal ledger. Larger cover-led collection entries, no fabricated analytics. Mobile menu traps focus, supports Escape and restores trigger focus.
+- Publishing: explicit gallery title/client/assigned-count confirmation. Bulk selection, preview, revoke, regenerate and original Drive actions remain available. No sharing or OAuth changes.
+- Acceptance: complete blade coverage at 0%; centre stable through rotation; progressive opening at 25/50/75%; no overlay at100%; no horizontal overflow at360/390px; photo and caption aligned; full portrait and landscape visible in viewer; studio actions reachable on touch and keyboard.
+
+## Reference research (21 November 2026)
+
+Inspected available page structures: [Jack Davison work index](https://www.jackdavison.co.uk/work-v-06), [Nadav Kander](https://www.nadavkander.com/), [Viviane Sassen](https://www.vivianesassen.com/), [Rinko Kawauchi](https://rinkokawauchi.com/en/), [Kawauchi works](https://rinkokawauchi.com/en/works/). Applicable patterns: photographer identity as a quiet anchor, pictures before explanatory copy, coherent series/order, sparse functional navigation, metadata as secondary type. Avoid portfolio-wide indexes in private client galleries, unnecessary subscriptions, copying composition, or acquiring reference photographs. Some requested/reference domains were unavailable or parked; these were not treated as usable design evidence. The browsing tool exposes document structure, not a full visual or interaction audit.
+
+Available skills actually used: brainstorming, writing-plans, executing-plans, verification-before-completion; review at the end. No additional UI library, motion package, MCP installation or external asset dependency. The separately referenced resource inventory and iPhone screenshot were not included in this task's accessible attachments; do not claim they were inspected.
 
 ## Automatic editorial composition
 

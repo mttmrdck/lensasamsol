@@ -7,7 +7,7 @@ import { ApiError, api, post } from '../../lib/api';
 import type { DriveStatus, FolderValidation } from '../../../shared/api';
 import { driveFolderUrl, parseDriveFolderInput } from '../../../shared/drive';
 import { PRESETS, THEMES, PAIRINGS, type PresetId } from '../../../shared/style';
-import { Button, Callout, Field, Input, cx } from '../../components/ui';
+import { Button, Callout, Confirm, Field, Input, cx } from '../../components/ui';
 import { useGoogleFonts } from '../../lib/fonts';
 import { plural } from '../../lib/format';
 import { openDrivePicker } from '../../lib/picker';
@@ -56,6 +56,7 @@ export default function NewCollectionPage() {
   const [folderError, setFolderError] = useState<{ message: string; code: string } | null>(null);
   const [cover, setCover] = useState<string | null>(null);
   const [preset, setPreset] = useState<PresetId>('minimal-archival');
+  const [confirmPublish, setConfirmPublish] = useState(false);
   const [saving, setSaving] = useState<null | 'draft' | 'publish'>(null);
   const reqId = useRef(0);
 
@@ -487,6 +488,10 @@ export default function NewCollectionPage() {
         </>
       )}
 
+      <Confirm open={confirmPublish} onOpenChange={setConfirmPublish}
+        title={`Publish “${title.trim()}”?`}
+        body={`Every supported photograph in “${folder?.name ?? 'this folder'}” will be shared with ${clientName.trim() || 'the intended client'}. The scan found ${folder?.imageCount ?? 0} photographs. To review individual assignments first, cancel and choose Create & Assign Photos.`}
+        confirmLabel="Publish gallery" loading={!!saving} onConfirm={() => submit(true)} />
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-canvas/95 backdrop-blur lg:left-[240px]">
         <div className="mx-auto flex max-w-[680px] items-center justify-between gap-3 px-4 py-3">
           <p className="hidden text-[12px] text-slate sm:block">
@@ -520,7 +525,7 @@ export default function NewCollectionPage() {
             ) : (
               <Button
                 variant="primary"
-                onClick={() => submit(true)}
+                onClick={() => setConfirmPublish(true)}
                 disabled={!ready || !!saving}
                 loading={saving === 'publish'}
               >

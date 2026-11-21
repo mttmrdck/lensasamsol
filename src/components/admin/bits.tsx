@@ -92,7 +92,7 @@ export function CopyClientLinkButton({
 
 export function CollectionCard({ c }: { c: AdminCollectionSummary }) {
   return (
-    <article className="group relative flex flex-col overflow-hidden rounded-ui border border-line bg-surface transition-colors duration-200 hover:border-line-strong">
+    <article className="studio-collection group relative flex flex-col overflow-hidden border-b border-line transition-colors duration-200">
       <Link
         to={`/admin/collections/${c.id}`}
         className="block focus-visible:outline-offset-[-2px]"
@@ -116,7 +116,7 @@ export function CollectionCard({ c }: { c: AdminCollectionSummary }) {
         </div>
         <div className="flex flex-col gap-0.5 px-4 pb-3 pt-3.5">
           <p className="truncate text-[12px] font-medium text-slate">{c.clientName ?? 'No client name'}</p>
-          <h3 className="truncate text-[15px] font-medium tracking-[-0.01em] text-ink">{c.title}</h3>
+          <h3 className="studio-collection-title truncate font-display text-[22px] tracking-[-0.025em] text-ink">{c.title}</h3>
           <p className="tnum flex flex-wrap gap-x-3 text-[13px] text-slate [&>span]:whitespace-nowrap">
             <span>{c.eventDate ? formatDate(c.eventDate, 'short') : 'No date'}</span>
             <span>{c.photoCount.toLocaleString('en-GB')} photos</span>
@@ -159,9 +159,9 @@ export function PageHeader({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-4 border-b border-line pb-5 sm:flex-row sm:items-end sm:justify-between">
+    <div className="studio-page-header flex flex-col gap-4 border-b border-line pb-6 sm:flex-row sm:items-end sm:justify-between">
       <div className="flex flex-col gap-1">
-        <h1 className="text-[22px] font-semibold tracking-[-0.015em]">{title}</h1>
+        <h1 className="font-display text-[clamp(30px,3.5vw,48px)] leading-tight tracking-[-0.035em]">{title}</h1>
         {sub && <p className="text-[13px] text-slate">{sub}</p>}
       </div>
       {children && <div className="flex flex-wrap gap-2">{children}</div>}

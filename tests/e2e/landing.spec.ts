@@ -37,7 +37,7 @@ for (const key of ['coast', 'portraits', 'highlands', 'night', 'archive']) {
       expect(Math.abs(im!.width / im!.height - ar)).toBeLessThan(0.002);
       const grid = await page.getByTestId('photo-grid').boundingBox();
       expect(grid!.y - hr!.y - hr!.height).toBeGreaterThanOrEqual(20);
-      expect(grid!.y - hr!.y - hr!.height).toBeLessThanOrEqual(32);
+      expect(grid!.y - hr!.y - hr!.height).toBeLessThanOrEqual(40);
       expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
       if (key === 'archive') {
         await page

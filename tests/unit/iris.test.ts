@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  anchorFromRect,
   bladePaths,
   fullRevealApothem,
   hexVertices,
@@ -40,14 +39,8 @@ describe('iris geometry', () => {
     expect(fullRevealApothem(390, 844, 195, 150)).toBeGreaterThanOrEqual(Math.hypot(195, 694));
   });
 
-  it('anchors on the cover focal point, kept inside photo and viewport', () => {
-    const rect = { left: 0, top: 0, width: 390, height: 490 };
-    const a = anchorFromRect(rect, { x: 0.55, y: 0.28 }, 390, 844, 100);
-    expect(a.x).toBeCloseTo(214.5, 1);
-    expect(a.y).toBeGreaterThanOrEqual(100 * 1.08 - 1e-9);
-    expect(anchorFromRect(null, null, 390, 844, 100)).toEqual({ x: 195, y: 422 });
-    const edge = anchorFromRect(rect, { x: 0, y: 1 }, 390, 844, 100);
-    expect(edge.x).toBeGreaterThan(0);
-    expect(edge.y).toBeLessThan(490);
+  it('starts completely closed and completes within 1.3 seconds', () => {
+    expect(irisFrame(0, 180, 1000).apothem).toBe(0);
+    expect(TIMELINE.revealEnd).toBeLessThanOrEqual(1300);
   });
 });

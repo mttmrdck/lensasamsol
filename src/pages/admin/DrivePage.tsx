@@ -8,10 +8,12 @@ import type { AdminCollectionSummary, DriveStatus, SyncRun } from '../../../shar
 import { relativeTime } from '../../lib/format';
 import { Button, Callout, Card, Confirm, Pill } from '../../components/ui';
 import { PageHeader, SyncLine } from '../../components/admin/bits';
+import { oauthFailureMessage } from '../../../shared/oauth';
 
 export default function DrivePage() {
   const qc = useQueryClient();
   const [params, setParams] = useSearchParams();
+  const [callbackError, setCallbackError] = useState(() => oauthFailureMessage(params.get('error')));
   const status = useQuery({
     queryKey: ['drive-status'],
     queryFn: () => api<DriveStatus>('/api/admin/drive/status'),
@@ -29,17 +31,23 @@ export default function DrivePage() {
 
   useEffect(() => {
     if (params.get('connected')) {
+      setCallbackError(null);
       toast.success('Google Drive connected.');
       setParams({}, { replace: true });
     } else if (params.get('error')) {
-      toast.error(params.get('error')!);
+      const message = oauthFailureMessage(params.get('error'))!;
+      setCallbackError(message);
+      toast.error(message);
       setParams({}, { replace: true });
     }
   }, [params, setParams]);
 
   const connect = useMutation({
     mutationFn: () => post<{ url: string }>('/api/admin/drive/connect'),
-    onSuccess: ({ url }) => location.assign(url),
+    onSuccess: ({ url }) => {
+      setCallbackError(null);
+      location.assign(url);
+    },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : 'Couldn’t start the Google sign-in.'),
   });
   const test = useMutation({
@@ -83,6 +91,12 @@ export default function DrivePage() {
         title="Drive Sync"
         sub="The app reads your folders; it never writes, moves or deletes anything in Google Drive."
       />
+
+      {callbackError && (
+        <Callout tone="err" title="Google Drive connection failed">
+          {callbackError}
+        </Callout>
+      )}
 
       {s && !s.configured && (
         <Callout tone="warn" title="Google credentials aren’t configured on the server">
@@ -232,7 +246,7 @@ export default function DrivePage() {
         open={confirmDisconnect}
         onOpenChange={setConfirmDisconnect}
         title="Disconnect Google Drive?"
-        body="Access is revoked at Google and the stored credential deleted. Published galleries keep their indexed photos, but previews that aren’t cached yet and re-syncs will fail until you reconnect. Nothing in Drive changes."
+        body="Access is revoked at Google and the stored credential deleted. Published galleries keep their indexed photo metadata, but previews and re-syncs stop until you reconnect. Files and sharing in Drive stay unchanged."
         confirmLabel="Disconnect"
         destructive
         loading={disconnect.isPending}

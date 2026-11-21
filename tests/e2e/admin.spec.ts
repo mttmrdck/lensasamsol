@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
-import { apiLogin, login, tokenOf } from './helpers';
+import { adminJson, apiLogin, login, tokenOf } from './helpers';
+import type { AdminCollectionDetail } from '../../shared/api';
 
 /** These suites test the gallery itself; the iris entrance has its own suite (intro.spec.ts). */
 test.beforeEach(async ({ context }) => {
@@ -9,6 +10,64 @@ test.beforeEach(async ({ context }) => {
 });
 
 test.describe('admin', () => {
+  test('editor hero appears when an initially typographic cover becomes photographic', async ({
+    page,
+    request,
+  }) => {
+    await page.route('https://fonts.googleapis.com/**', (route) =>
+      route.fulfill({ contentType: 'text/css', body: '' }),
+    );
+    await apiLogin(request);
+    const original = await adminJson<AdminCollectionDetail>(
+      request,
+      'GET',
+      '/api/admin/collections/col_demo_coast',
+    );
+    await adminJson(request, 'PUT', '/api/admin/collections/col_demo_coast/style', {
+      style: { ...original.styleDraft, cover: { ...original.styleDraft.cover, style: 'typographic' } },
+    });
+    try {
+      await login(page);
+      await page.goto('/admin/collections/col_demo_coast/design');
+      await expect(page.getByTestId('typographic-hero')).toBeVisible();
+      await page.getByRole('tab', { name: 'Cover', exact: true }).click();
+      await page
+        .getByRole('radiogroup', { name: 'Cover style' })
+        .getByRole('radio', { name: 'Featured', exact: true })
+        .click();
+      const image = page.getByTestId('featured-hero').locator('.g-hero-img');
+      await expect(image).toHaveAttribute('src', /\/img\//);
+      await expect
+        .poll(() => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0))
+        .toBe(true);
+    } finally {
+      await adminJson(request, 'PUT', '/api/admin/collections/col_demo_coast/style', {
+        style: original.styleDraft,
+      });
+    }
+  });
+
+  test('editor lightbox remains inside its smaller mobile preview frame', async ({ page }) => {
+    await page.route('https://fonts.googleapis.com/**', (route) =>
+      route.fulfill({ contentType: 'text/css', body: '' }),
+    );
+    await login(page);
+    await page.goto('/admin/collections/col_demo_coast/design');
+    await page.getByRole('radio', { name: /Mobile/ }).click();
+    const frame = page.getByTestId('preview-frame');
+    await expect.poll(async () => (await frame.boundingBox())?.width).toBe(390);
+    await frame.locator('.g-tile-link').first().click();
+    const viewer = frame.getByTestId('lightbox');
+    await expect(viewer).toBeVisible();
+    const f = (await frame.boundingBox())!;
+    const v = (await viewer.boundingBox())!;
+    expect(v.y).toBeGreaterThanOrEqual(f.y - 1);
+    expect(v.y + v.height).toBeLessThanOrEqual(f.y + f.height + 1);
+    await expect(viewer.getByRole('button', { name: /filmstrip/ })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(viewer).toBeHidden();
+  });
+
   test('admin routes are protected and login rejects a wrong password', async ({ page, request }) => {
     await page.goto('/admin/collections');
     await expect(page).toHaveURL(/\/admin\/login\?next=/);
@@ -118,4 +177,55 @@ test.describe('admin', () => {
       'darkroom',
     );
   });
+});
+
+test('mobile studio menu traps focus and restores it on Escape', async ({ page }) => {
+  await page.setViewportSize({width:390,height:844});
+  await login(page);
+  await page.getByRole('button', {name:'Open menu'}).click();
+  const menu=page.getByRole('dialog', {name:'Menu',exact:true});
+  await expect(menu).toBeVisible();
+  for(let i=0;i<15;i++) {
+    await page.keyboard.press('Tab');
+    expect(await menu.evaluate(el=>el.contains(document.activeElement))).toBe(true);
+  }
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(page.getByRole('button', {name:'Open menu'})).toBeFocused();
+});
+
+test('resizing an open mobile menu to desktop releases the workspace', async ({ page }) => {
+  await page.setViewportSize({width:390,height:844});
+  await login(page);
+  await page.getByRole('button', {name:'Open menu'}).click();
+  await page.setViewportSize({width:1440,height:900});
+  await expect(page.getByRole('dialog', {name:'Menu',exact:true})).toHaveCount(0);
+  expect(await page.evaluate(()=>document.body.style.overflow)).toBe('');
+  await page.getByRole('link', {name:'Create Client Gallery',exact:true}).click();
+  await expect(page).toHaveURL(/collections\/new/);
+});
+
+test('publishing waits for an in-flight photo selection change', async ({ page, request }) => {
+  await apiLogin(request);
+  const id='col_demo_lights';
+  const original=await adminJson<AdminCollectionDetail>(request,'GET',`/api/admin/collections/${id}`);
+  let release!:()=>void;
+  const pending=new Promise<void>(resolve=>{release=resolve});
+  await page.route(`**/api/admin/collections/${id}/photos/*`,async route=>{
+    if(route.request().method()==='PATCH') await pending;
+    await route.continue();
+  });
+  try {
+    await login(page);await page.goto(`/admin/collections/${id}`);
+    await page.locator('li[data-assigned="true"] > button[aria-pressed="true"]').first().click();
+    await expect(page.getByRole('button',{name:'Publish',exact:true})).toBeDisabled({timeout:1000});
+    release();
+    await expect(page.getByRole('button',{name:'Publish',exact:true})).toBeEnabled();
+    await page.getByRole('button',{name:'Publish',exact:true}).click();
+    await expect(page.getByRole('alertdialog')).toContainText(`${original.photos.filter(p=>p.assigned).length-1} assigned photographs`);
+    await page.getByRole('button',{name:'Cancel',exact:true}).click();
+  } finally {
+    release();await page.unrouteAll({behavior:'wait'});
+    await adminJson(request,'POST',`/api/admin/collections/${id}/photos/bulk`,{ids:original.photos.filter(p=>p.assigned).map(p=>p.id),assigned:true});
+  }
 });

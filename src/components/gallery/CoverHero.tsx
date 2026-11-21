@@ -1,3 +1,5 @@
+import { useRef, useState } from 'react';
+import { useElementWidth } from './hooks';
 import { naturalAspect } from '../../../shared/composition';
 import type { PublicCollection, PublicPhoto, PublicStudio } from '../../../shared/api';
 import type { StyleConfig } from '../../../shared/style';
@@ -18,7 +20,10 @@ interface Props {
  */
 export function CoverHero({ collection, cover, studio, style, count }: Props) {
   const { imgUrl, srcSet } = useImages();
+  const mediaRef = useRef<HTMLDivElement>(null);
+  const [failedId, setFailedId] = useState<string | null>(null);
   const showImage = cover && style.cover.style !== 'typographic';
+  const mediaWidth = useElementWidth(mediaRef, !!showImage);
   const aspect = cover ? naturalAspect(cover) : 1.5;
   const customSubtitle = style.composition?.subtitle?.trim();
   const description = style.cover.showDescription ? collection.description : null;
@@ -55,7 +60,10 @@ export function CoverHero({ collection, cover, studio, style, count }: Props) {
       data-testid={showImage ? 'featured-hero' : 'typographic-hero'}
       data-cover-style={style.cover.style}
     >
-      <div className="g-exhibition-wordmark">{studio.name}</div>
+      <div className="g-exhibition-masthead">
+        <span className="g-exhibition-wordmark">{studio.name}</span>
+        <span className="g-edition-label">A private photographic edition</span>
+      </div>
       {showImage ? (
         <figure
           className={`g-exhibition-plate ${aspect < 0.92 ? 'g-exhibition-portrait' : ''}`}
@@ -66,18 +74,29 @@ export function CoverHero({ collection, cover, studio, style, count }: Props) {
             } as React.CSSProperties
           }
         >
-          <div className="g-exhibition-media">
-            <img
-              className="g-hero-img"
-              src={imgUrl(cover.id, 'l')}
-              srcSet={srcSet(cover.id, cover.w, cover.h)}
-              sizes="100vw"
-              width={cover.w > 0 ? cover.w : 1500}
-              height={cover.h > 0 ? cover.h : 1000}
-              alt=""
-              decoding="async"
-              fetchPriority="high"
-            />
+          <div ref={mediaRef} className="g-exhibition-media">
+            {failedId === cover.id ? (
+              <div className="absolute inset-0 grid place-items-center g-muted text-sm" role="status">
+                Preview unavailable
+              </div>
+            ) : (
+              <img
+                className="g-hero-img"
+                src={mediaWidth > 0 ? imgUrl(cover.id, 'l') : undefined}
+                srcSet={
+                  mediaWidth > 0
+                    ? srcSet(cover.id, cover.w, cover.h, collection.source === 'demo' ? 'l' : 'xl')
+                    : undefined
+                }
+                sizes={mediaWidth > 0 ? `${mediaWidth}px` : '100vw'}
+                onError={() => setFailedId(cover.id)}
+                width={cover.w > 0 ? cover.w : 1500}
+                height={cover.h > 0 ? cover.h : 1000}
+                alt=""
+                decoding="async"
+                fetchPriority="high"
+              />
+            )}
           </div>
           <figcaption>{caption}</figcaption>
         </figure>

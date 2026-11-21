@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { GalleryResponse } from '../../../../shared/api';
 import { imgUrl, srcSet } from '../../../lib/format';
 
@@ -57,6 +57,10 @@ export function useGalleryEntrance(
   );
   const [titlesIn, setTitlesIn] = useState(false);
   const started = useRef(false);
+  const currentState = useRef(state);
+  useEffect(() => {
+    currentState.current = state;
+  }, [state]);
 
   const markSeen = useCallback(() => {
     try {
@@ -73,7 +77,12 @@ export function useGalleryEntrance(
 
   // Data arrived: decide, then wait (bounded) for the cover to be decoded before opening.
   useEffect(() => {
-    if (state !== 'pending' || !data || started.current) return;
+    if (!data || started.current) return;
+    if (currentState.current !== 'pending') {
+      // A cover/data change during the wait must release the visitor instead of losing its timer.
+      if (currentState.current === 'closed') setState('fading');
+      return;
+    }
     started.current = true;
     const cover = data.collection.cover;
     const style = data.collection.style.cover.style;
@@ -85,9 +94,12 @@ export function useGalleryEntrance(
     // Same src/srcset/sizes as the hero image, so the browser fetches and decodes the cover only once.
     const img = new Image();
     img.decoding = 'async';
-    img.sizes = '100vw';
-    img.srcset = srcSet(cover.id, cover.w, cover.h, token);
-    img.src = imgUrl(cover.id, 'l', token);
+    const hero = document.querySelector<HTMLImageElement>('.g-hero-img');
+    img.sizes = hero?.sizes || '100vw';
+    img.srcset =
+      hero?.srcset ||
+      srcSet(cover.id, cover.w, cover.h, token, data.collection.source === 'demo' ? 'l' : 'xl');
+    img.src = hero?.src || imgUrl(cover.id, 'l', token);
     let settled = false;
     const timer = window.setTimeout(() => {
       if (settled) return;
@@ -110,20 +122,45 @@ export function useGalleryEntrance(
         setState((s) => (s === 'closed' ? 'fading' : s)); // broken cover: fall back to the gallery's own placeholder state
       });
     return () => {
-      // Unmount/route change mid-wait: stop waiting. (StrictMode re-runs are guarded by `started`.)
+      // Cancel only on data/route change or unmount, not on our own pending → closed transition.
+      settled = true;
       window.clearTimeout(timer);
+      started.current = false;
     };
-  }, [state, data, token, markSeen]);
+  }, [data, token, markSeen]);
+
+  // Includes stalled gallery metadata, not just the cover-image deadline.
+  useEffect(() => {
+    if (state !== 'pending') return;
+    const timer = window.setTimeout(() => { markSeen(); setState('off'); }, 4500);
+    return () => clearTimeout(timer);
+  }, [state, markSeen]);
+
+  useEffect(() => {
+    const media = matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => { if (media.matches) { setState('off'); setTitlesIn(true); } };
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
 
   // While the overlay is up: lock page scroll; restore on any exit path.
   const active = state === 'pending' || state === 'closed' || state === 'opening' || state === 'fading';
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!active) return;
     const el = document.documentElement;
     const prev = el.style.overflow;
+    const bodyOverflow = document.body.style.overflow;
+    const backgrounds = [el.style.background, document.body.style.background];
+    const overscroll = el.style.overscrollBehavior;
+    el.style.background = document.body.style.background = '#161715';
+    el.style.overscrollBehavior = 'none';
+    document.body.style.overflow = 'hidden';
     el.style.overflow = 'hidden';
     return () => {
       el.style.overflow = prev;
+      document.body.style.overflow = bodyOverflow;
+      [el.style.background, document.body.style.background] = backgrounds;
+      el.style.overscrollBehavior = overscroll;
     };
   }, [active]);
 
@@ -148,7 +185,7 @@ export function useGalleryEntrance(
     overlayVisible: active,
     onReveal: () => setTitlesIn(true),
     onOpened: () => setState('done'),
-    onFaded: () => setState('done'),
+    onFaded: () => { markSeen(); setState('done'); },
     skip,
   };
 }
