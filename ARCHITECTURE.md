@@ -5,7 +5,7 @@ independent link that displays only that client's assigned photographs.
 
 ```
 Client browser ──/api/public/g/:token──────▶ Worker (Hono) ──▶ D1: gallery WHERE share_token=? AND published
-               ──/img/t/:token/:photo/:v──▶   │  photo must be ASSIGNED to THAT gallery → Cache API → Drive thumbnail
+               ──/img/t/:token/:photo/:v──▶   │  ASSIGNED + PUBLISHED + active connection → derivative cache → Drive media → Images
                ──/api/public/studio───────▶   │  studio name/intro/contact only (no galleries)
                └─ "Open Original in Google Drive ↗" ────────────────▶ drive.google.com/file/d/<id> (Drive's own sharing)
 Owner browser  ──/api/admin/*, /img/a/*───▶   │  session cookie + CSRF + rate limit
@@ -42,16 +42,15 @@ parsing — imported by both sides), `migrations/`, `scripts/`, `tests/{unit,e2e
 | Password session for the single owner (PBKDF2-SHA256 100k, hashed random session token in D1)           | Admin identity is separate from the Google connection (spec). No sign-up. Login throttled (6 failures / 15 min / IP, durable in D1).                                                                                                                                           |
 | CSRF: `SameSite=Lax` cookie + required `x-archive-csrf` header + exact `Origin` match on every mutation | Lax is required so the OAuth redirect back from Google carries the session.                                                                                                                                                                                                    |
 | Draft vs published style                                                                                | `style_draft_json` vs `style_published_json`. _Save draft_ writes only the draft; _Publish changes_ writes both. The client link reads only the published style; the owner's Preview Client Experience (`/admin/collections/:id/preview`, session) reads the draft.            |
-| Images: `/img/t/:token/:photo/:v` (client) and `/img/a/:photo/:v` (owner session)                       | Authorisation happens before any cache lookup; the edge cache is keyed by Drive file + version + variant and never decides access. Client images are `Cache-Control: private, max-age=3600`. Fixed variants (480/960/1600 long edge); no user-supplied sizes or upstream URLs. |
+| Images: `/img/t/:token/:photo/:v` (client) and `/img/a/:photo/:v` (owner session)                       | Authorization and active Drive connection are checked before conditional responses or internal cache access. Browser delivery is `private, no-store`. Fixed 480/960/1600/2560-long-edge derivatives; no user-supplied sizes or upstream URLs. |
 | Demo mode = fixture "folders" through the same sync path                                                | Proves diff/sync/UI without pretending to be Drive; demo rows have `source='demo'` and are filtered when `DEMO_MODE` is off.                                                                                                                                                   |
 
 ## Corrections to the research blueprint
 
-1. _"Worker image proxy with resized variants and R2 edge caching … sub-100ms global loads."_ A Worker
-   doesn't resize bytes for free and Cache API doesn't work on `*.workers.dev`. We **don't resize**: we
-   request Drive's own rendered thumbnail at fixed long-edge sizes (`thumbnailLink` with `=s<size>`;
-   undocumented convention — the main technical risk) and cache per `fileId + version + variant`. No
-   latency guarantee is made. R2 isn't used (not needed; would add a paid-tier risk at scale).
+1. _"Worker image proxy with resized variants and R2 edge caching … sub-100ms global loads."_ There is no
+   latency guarantee or R2 storage. The repaired pipeline uses the documented Drive `alt=media` endpoint
+   and a streaming Images binding. The old implementation ignored the variant size and returned the same
+   220px thumbnail for every tier. No undocumented thumbnail URL size rewrite is used.
 2. _"Store `drive_refresh_token` in studio_settings."_ Changed: separate `google_connections` row,
    encrypted, revocable.
 3. _"`?photo=` via `history.replaceState`."_ Opening a photo **pushes** a history entry (so Back closes
@@ -59,7 +58,42 @@ parsing — imported by both sides), `migrations/`, `scripts/`, `tests/{unit,e2e
 4. _"Download via Drive" wording._ Kept as an option, but the default is "Open original in Google Drive ↗"
    with helper copy — Drive does not auto-download.
 5. _Image dimensions._ Drive reports sensor dimensions plus `rotation`; we transpose for 90°/270° so
-   phone portraits lay out correctly. Drive thumbnails are rendered upright (to be verified with real data).
+   phone portraits lay out correctly. Real staging samples confirmed this mapping; local Images codec
+   regressions verify EXIF-oriented portrait/landscape derivatives with metadata removed.
+
+## Private responsive image delivery
+
+`shared/image-variants.ts` defines the fixed long edges. The Worker checks metadata type, size and
+`capabilities.canDownload`, then streams at most 20,000,000 source bytes from the fixed Google media
+endpoint through `IMAGES`. Originals are not collected in Worker memory or stored. Only WebP preview
+derivatives (at most 2560px long edge, 8MiB output cap) can enter the internal Cache API. A cached xl
+master is reused to generate smaller sizes; simultaneous cold misses may still fetch the source more
+than once because live response streams are never shared across requests.
+
+Cache keys and ETags include file/version, variant, pipeline version, connection epoch, and binding/key
+configuration through an opaque hash. Every client/admin response is `private, no-store`; no shared
+HTTP cache is enabled in front of gallery authorization. Revocation, unpublishing, assignment removal,
+unavailable photos and disconnects are checked before cache/304 responses. Pixels a visitor already
+viewed or saved cannot be recalled. Internal derivatives expire after an hour; version/connection
+changes immediately use different keys. Cache availability is runtime-dependent; misses remain safe.
+
+Missing binding, transformation failure, input above 20MB, or denied download capability uses only the
+documented authenticated thumbnail as degraded fallback, tagged `X-Preview-Quality: thumbnail-fallback`
+and cached internally for at most 60 seconds. Such fallback is not claimed to be high-resolution or
+metadata-free. No failure path returns original bytes or follows a redirect. Stream failures after
+response headers abort the body and cannot populate the internal cache.
+
+The local/test/staging `IMAGES` binding is configured in source only; deploying it requires approval.
+No production overlay was changed. Images transformation quotas/pricing apply; there is no Images/R2
+original storage. See [binding documentation](https://developers.cloudflare.com/images/optimization/binding/)
+and [pricing](https://developers.cloudflare.com/images/pricing/). Verify the real staging binding after an
+approved deployment; offline codec and synthetic browser tests do not prove edge service availability.
+
+The viewer measures the available stage after toolbar/footer layout and fits an explicit image box,
+preserving full aspect ratio independently of intrinsic thumbnail dimensions. Responsive sources use
+actual oriented dimensions and DPR; grid virtualization and lazy loading remain. Hero preloading and
+rendering share source selection. Only adjacent viewer images are prefetched; originals still open in
+Drive under Drive's existing sharing permissions.
 
 ## Data model (D1)
 
