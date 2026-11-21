@@ -185,7 +185,8 @@ test('resizing an open mobile menu to desktop releases the workspace', async ({ 
   await page.getByRole('button', {name:'Open menu'}).click();
   await page.setViewportSize({width:1440,height:900});
   await expect(page.getByRole('dialog', {name:'Menu',exact:true})).toHaveCount(0);
-  expect(await page.evaluate(()=>document.body.style.overflow)).toBe('');
+  // Scroll lock is released by the menu's effect cleanup, which runs just after it unmounts.
+  await expect.poll(()=>page.evaluate(()=>document.body.style.overflow)).toBe('');
   await page.getByRole('link', {name:'Create Client Gallery',exact:true}).click();
   await expect(page).toHaveURL(/collections\/new/);
 });

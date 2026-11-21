@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { useElementWidth } from './hooks';
 import { naturalAspect } from '../../../shared/composition';
 import type { PublicCollection, PublicPhoto, PublicStudio } from '../../../shared/api';
@@ -12,13 +12,15 @@ interface Props {
   studio: PublicStudio;
   style: StyleConfig;
   count: number;
+  /** Rendered at the right of the masthead (public galleries: Download all). */
+  headerAction?: ReactNode;
 }
 
 /** One static photographic opening, shared verbatim by client links and the editor canvas.
  * Legacy photographic cover styles keep their saved settings but use this exhibition composition.
  * A deliberately selected typography-only cover is still respected.
  */
-export function CoverHero({ collection, cover, studio, style, count }: Props) {
+export function CoverHero({ collection, cover, studio, style, count, headerAction }: Props) {
   const { imgUrl, srcSet } = useImages();
   const mediaRef = useRef<HTMLDivElement>(null);
   const [failedId, setFailedId] = useState<string | null>(null);
@@ -62,6 +64,7 @@ export function CoverHero({ collection, cover, studio, style, count }: Props) {
     >
       <div className="g-exhibition-masthead">
         <span className="g-exhibition-wordmark">{studio.name}</span>
+        {headerAction}
       </div>
       {showImage ? (
         <figure

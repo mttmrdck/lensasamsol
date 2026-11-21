@@ -41,8 +41,8 @@ export function DownloadAll({
 }: {
   photos: DownloadPhoto[];
   title: string;
-  /** `bar`: sits in the gallery header (button top-right, status on its own row). */
-  variant?: 'inline' | 'bar';
+  /** `bar`/`masthead`: sits in the gallery header (button top-right, status beneath it). */
+  variant?: 'inline' | 'bar' | 'masthead';
 }) {
   const { downloadUrl } = useImages();
   const [state, setState] = useState<State>({ kind: 'idle' });
@@ -104,7 +104,10 @@ export function DownloadAll({
   };
 
   return (
-    <div className={variant === 'bar' ? 'g-dl g-dl-bar' : 'g-dl'} data-testid="download-all">
+    <div
+      className={variant === 'bar' ? 'g-dl g-dl-bar' : variant === 'masthead' ? 'g-dl g-dl-masthead' : 'g-dl'}
+      data-testid="download-all"
+    >
       {(state.kind === 'idle' || state.kind === 'done' || state.kind === 'error') && (
         <button
           type="button"
@@ -118,7 +121,7 @@ export function DownloadAll({
           <Download size={14} strokeWidth={1.75} aria-hidden="true" />
           {state.kind === 'done'
             ? 'Download again'
-            : variant === 'bar'
+            : variant !== 'inline'
               ? 'Download all'
               : `Download all (${plural(photos.length, 'photo')})`}
         </button>

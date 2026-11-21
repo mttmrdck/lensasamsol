@@ -97,10 +97,14 @@ test.describe('Customize Design tabs', () => {
     await page.keyboard.press('ArrowRight');
     await expect(tab(page, 'Layout')).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByLabel('Photo order')).toHaveCount(1);
+    // One key at a time, as a person types: wait for each tab (and focus) to settle before the next key.
     await page.keyboard.press('ArrowRight');
+    await expect(tab(page, 'Cover')).toHaveAttribute('aria-selected', 'true');
+    await expect(tab(page, 'Cover')).toBeFocused();
     await page.keyboard.press('ArrowRight');
     await expect(tab(page, 'Colour')).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByLabel('Photo order')).toHaveCount(0);
+    await expect(tab(page, 'Colour')).toBeFocused();
     await page.keyboard.press('Home');
     await expect(tab(page, 'Presets')).toHaveAttribute('aria-selected', 'true');
   });

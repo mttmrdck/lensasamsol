@@ -256,7 +256,18 @@ export function GalleryRenderer(props: GalleryRendererProps) {
             </div>
           ) : (
             <>
-              <CoverHero collection={collection} cover={cover} studio={studio} style={style} count={count} />
+              <CoverHero
+                collection={collection}
+                cover={cover}
+                studio={studio}
+                style={style}
+                count={count}
+                headerAction={
+                  mode === 'public' ? (
+                    <DownloadAll variant="masthead" photos={sourcePhotos} title={collection.title} />
+                  ) : undefined
+                }
+              />
               <section ref={gridRef} className="g-wrap g-exhibition-gallery pb-16" aria-label="All photographs">
                 {gallery}
               </section>
@@ -276,7 +287,6 @@ export function GalleryRenderer(props: GalleryRendererProps) {
                     )}
                   </div>
                   <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
-                    {mode === 'public' && <DownloadAll photos={sourcePhotos} title={collection.title} />}
                     {folderLink && (
                       <a
                         className="inline-flex min-h-11 items-center gap-1.5 hover:opacity-70"

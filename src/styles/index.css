@@ -855,6 +855,14 @@
   grid-column: 2;
   grid-row: 1;
 }
+.g-dl-masthead {
+  align-items: flex-end;
+  padding: 10px 0;
+}
+.g-dl-masthead .g-dl-note {
+  max-width: 30ch;
+  text-align: right;
+}
 .g-dl-bar .g-dl-note {
   grid-column: 1 / -1;
   max-width: none;
